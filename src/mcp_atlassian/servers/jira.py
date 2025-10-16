@@ -12,7 +12,7 @@ from mcp_atlassian.exceptions import MCPAtlassianAuthenticationError
 from mcp_atlassian.jira.constants import DEFAULT_READ_JIRA_FIELDS
 from mcp_atlassian.models.jira.common import JiraUser
 from mcp_atlassian.servers.dependencies import get_jira_fetcher
-from mcp_atlassian.utils.decorators import check_write_access
+from mcp_atlassian.utils.decorators import check_write_access, handle_tool_errors
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,7 @@ jira_mcp = FastMCP(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="user", service_name="Jira")
 async def get_user_profile(
     ctx: Context,
     user_identifier: Annotated[
@@ -81,6 +82,7 @@ async def get_user_profile(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="issue", service_name="Jira")
 async def get_issue(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -164,6 +166,7 @@ async def get_issue(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="issues", service_name="Jira")
 async def search(
     ctx: Context,
     jql: Annotated[
@@ -251,6 +254,7 @@ async def search(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="fields", service_name="Jira")
 async def search_fields(
     ctx: Context,
     keyword: Annotated[
@@ -285,6 +289,7 @@ async def search_fields(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="issues", service_name="Jira")
 async def get_project_issues(
     ctx: Context,
     project_key: Annotated[str, Field(description="The project key")],
@@ -317,6 +322,7 @@ async def get_project_issues(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="transitions", service_name="Jira")
 async def get_transitions(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -337,6 +343,7 @@ async def get_transitions(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="worklogs", service_name="Jira")
 async def get_worklog(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -357,6 +364,7 @@ async def get_worklog(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="result", service_name="Jira")
 async def download_attachments(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -380,6 +388,7 @@ async def download_attachments(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="boards", service_name="Jira")
 async def get_agile_boards(
     ctx: Context,
     board_name: Annotated[
@@ -430,6 +439,7 @@ async def get_agile_boards(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="issues", service_name="Jira")
 async def get_board_issues(
     ctx: Context,
     board_id: Annotated[str, Field(description="The id of the board (e.g., '1001')")],
@@ -507,6 +517,7 @@ async def get_board_issues(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="sprints", service_name="Jira")
 async def get_sprints_from_board(
     ctx: Context,
     board_id: Annotated[str, Field(description="The id of board (e.g., '1000')")],
@@ -544,6 +555,7 @@ async def get_sprints_from_board(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="sprint_issues", service_name="Jira")
 async def get_sprint_issues(
     ctx: Context,
     sprint_id: Annotated[str, Field(description="The id of sprint (e.g., '10001')")],
@@ -592,6 +604,7 @@ async def get_sprint_issues(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="link_types", service_name="Jira")
 async def get_link_types(ctx: Context) -> str:
     """Get all available issue link types.
 
@@ -609,6 +622,7 @@ async def get_link_types(ctx: Context) -> str:
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="issue", service_name="Jira")
 async def create_issue(
     ctx: Context,
     project_key: Annotated[
@@ -714,6 +728,7 @@ async def create_issue(
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="issues", service_name="Jira")
 async def batch_create_issues(
     ctx: Context,
     issues: Annotated[
@@ -782,6 +797,7 @@ async def batch_create_issues(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="changelogs", service_name="Jira")
 async def batch_get_changelogs(
     ctx: Context,
     issue_ids_or_keys: Annotated[
@@ -855,6 +871,7 @@ async def batch_get_changelogs(
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="issue", service_name="Jira")
 async def update_issue(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -864,16 +881,9 @@ async def update_issue(
             description=(
                 "Dictionary of fields to update. For 'assignee', provide a string identifier (email, name, or accountId). "
                 "Example: `{'assignee': 'user@example.com', 'summary': 'New Summary'}`"
-            )
+            ),
         ),
     ],
-    additional_fields: Annotated[
-        dict[str, Any] | None,
-        Field(
-            description="(Optional) Dictionary of additional fields to update. Use this for custom fields or more complex updates.",
-            default=None,
-        ),
-    ] = None,
     attachments: Annotated[
         str | None,
         Field(
@@ -890,8 +900,7 @@ async def update_issue(
     Args:
         ctx: The FastMCP context.
         issue_key: Jira issue key.
-        fields: Dictionary of fields to update.
-        additional_fields: Optional dictionary of additional fields.
+        fields: (Required) Dictionary of fields to update.
         attachments: Optional JSON array string or comma-separated list of file paths.
 
     Returns:
@@ -905,11 +914,6 @@ async def update_issue(
     if not isinstance(fields, dict):
         raise ValueError("fields must be a dictionary.")
     update_fields = fields
-
-    # Use additional_fields directly as dict
-    extra_fields = additional_fields or {}
-    if not isinstance(extra_fields, dict):
-        raise ValueError("additional_fields must be a dictionary.")
 
     # Parse attachments
     attachment_paths = []
@@ -932,7 +936,7 @@ async def update_issue(
             )
 
     # Combine fields and additional_fields
-    all_updates = {**update_fields, **extra_fields}
+    all_updates = {**update_fields}
     if attachment_paths:
         all_updates["attachments"] = attachment_paths
 
@@ -956,6 +960,7 @@ async def update_issue(
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="result", service_name="Jira")
 async def delete_issue(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g. PROJ-123)")],
@@ -981,6 +986,7 @@ async def delete_issue(
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="comment", service_name="Jira")
 async def add_comment(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -1007,6 +1013,7 @@ async def add_comment(
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="worklog", service_name="Jira")
 async def add_worklog(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -1074,6 +1081,7 @@ async def add_worklog(
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="issue", service_name="Jira")
 async def link_to_epic(
     ctx: Context,
     issue_key: Annotated[
@@ -1107,6 +1115,7 @@ async def link_to_epic(
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="result", service_name="Jira")
 async def create_issue_link(
     ctx: Context,
     link_type: Annotated[
@@ -1175,6 +1184,7 @@ async def create_issue_link(
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="result", service_name="Jira")
 async def create_remote_issue_link(
     ctx: Context,
     issue_key: Annotated[
@@ -1257,6 +1267,7 @@ async def create_remote_issue_link(
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="result", service_name="Jira")
 async def remove_issue_link(
     ctx: Context,
     link_id: Annotated[str, Field(description="The ID of the link to remove")],
@@ -1283,6 +1294,7 @@ async def remove_issue_link(
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="issue", service_name="Jira")
 async def transition_issue(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -1356,6 +1368,7 @@ async def transition_issue(
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="sprint", service_name="Jira")
 async def create_sprint(
     ctx: Context,
     board_id: Annotated[str, Field(description="The id of board (e.g., '1000')")],
@@ -1401,6 +1414,7 @@ async def create_sprint(
 
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="sprint", service_name="Jira")
 async def update_sprint(
     ctx: Context,
     sprint_id: Annotated[str, Field(description="The id of sprint (e.g., '10001')")],
@@ -1458,6 +1472,7 @@ async def update_sprint(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="versions", service_name="Jira")
 async def get_project_versions(
     ctx: Context,
     project_key: Annotated[str, Field(description="Jira project key (e.g., 'PROJ')")],
@@ -1469,6 +1484,7 @@ async def get_project_versions(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="projects", service_name="Jira")
 async def get_all_projects(
     ctx: Context,
     include_archived: Annotated[
@@ -1533,8 +1549,60 @@ async def get_all_projects(
     return json.dumps(projects, indent=2, ensure_ascii=False)
 
 
+@jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="issue_types", service_name="Jira")
+async def get_all_issue_types(
+    ctx: Context,
+    project_key: Annotated[str, Field(description="Jira project key (e.g., 'PROJ')")],
+) -> str:
+    """Get all issue types for a specific Jira project.
+    Args:
+        ctx: The FastMCP context.
+        project_key: The project key.
+
+    Returns:
+        JSON string representing a list of issue types.
+
+    Raises:
+        ValueError: If the Jira client is not configured or available.
+    """
+    jira = await get_jira_fetcher(ctx)
+    issue_types = jira.get_project_issue_types(project_key)
+    return json.dumps(issue_types, indent=2, ensure_ascii=False)
+
+
+@jira_mcp.tool(tags={"jira", "read"})
+@handle_tool_errors(default_return_key="required_fields", service_name="Jira")
+async def get_required_fields(
+    ctx: Context,
+    issue_type: Annotated[
+        str,
+        Field(
+            description="Jira issue type (e.g., 'Task', 'Bug', 'Story', 'Epic', 'Subtask')"
+        ),
+    ],
+    project_key: Annotated[str, Field(description="Jira project key (e.g., 'PROJ')")],
+) -> str:
+    """Get required fields for a specific Jira issue type in a project.
+    Args:
+        ctx: The FastMCP context.
+        issue_type: The issue type.
+        project_key: The project key.
+
+    Returns:
+        JSON string representing a list of required fields.
+
+    Raises:
+        ValueError: If the Jira client is not configured or available.
+    """
+    jira = await get_jira_fetcher(ctx)
+    required_fields = jira.get_required_fields(issue_type, project_key)
+    return json.dumps(required_fields, indent=2, ensure_ascii=False)
+
+
 @jira_mcp.tool(tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="version", service_name="Jira")
 async def create_version(
     ctx: Context,
     project_key: Annotated[str, Field(description="Jira project key (e.g., 'PROJ')")],
@@ -1583,6 +1651,7 @@ async def create_version(
 
 @jira_mcp.tool(name="batch_create_versions", tags={"jira", "write"})
 @check_write_access
+@handle_tool_errors(default_return_key="results", service_name="Jira")
 async def batch_create_versions(
     ctx: Context,
     project_key: Annotated[str, Field(description="Jira project key (e.g., 'PROJ')")],
