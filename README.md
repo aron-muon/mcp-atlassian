@@ -610,7 +610,7 @@ For Jira Server/DC, use:
 Instead of using `stdio`, you can run the server as a persistent HTTP service using either:
 
 - `sse` (Server-Sent Events) transport at `/sse` endpoint
-- `streamable-http` transport at `/mcp` endpoint
+- `streamable-http` transport at `/mcp` endpoint (stateful or stateless)
 
 Both transport types support single-user and multi-user authentication:
 
@@ -625,12 +625,34 @@ Both transport types support single-user and multi-user authentication:
 
 1. Start the server with your chosen transport:
 
+<<<<<<< HEAD
    ```bash
    # For SSE transport
    docker run --rm -p 9000:9000 \
      --env-file /path/to/your/.env \
      ghcr.io/sooperset/mcp-atlassian:latest \
      --transport sse --port 9000 -vv
+=======
+    ```bash
+    # For SSE transport
+    docker run --rm -p 9000:9000 \
+      --env-file /path/to/your/.env \
+      ghcr.io/sooperset/mcp-atlassian:latest \
+      --transport sse --port 9000 -vv
+
+    # OR for streamable-http transport
+    docker run --rm -p 9000:9000 \
+      --env-file /path/to/your/.env \
+      ghcr.io/sooperset/mcp-atlassian:latest \
+      --transport streamable-http --port 9000 -vv
+
+    # OR for stateless streamable-http transport
+    docker run --rm -p 9000:9000 \
+      --env-file /path/to/your/.env \
+      ghcr.io/sooperset/mcp-atlassian:latest \
+      --transport streamable-http --stateless --port 9000 -vv
+    ```
+>>>>>>> wyn_stateless
 
    # OR for streamable-http transport
    docker run --rm -p 9000:9000 \
