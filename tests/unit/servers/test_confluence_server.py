@@ -94,6 +94,29 @@ def mock_confluence_fetcher():
     }
     mock_fetcher.search_user.return_value = [mock_user_search_result]
 
+    # Mock page version methods
+    mock_fetcher.get_page_versions.return_value = [
+        {
+            "number": 1,
+            "when": "2023-01-01T10:00:00.000Z",
+            "message": "Initial version",
+            "minor_edit": False,
+        }
+    ]
+
+    # Mock get_page_version method
+    mock_fetcher.get_page_content.return_value = mock_page
+
+    # Mock user details methods - need to return ConfluenceUser object
+    mock_user_obj = MagicMock()
+    mock_user_obj.to_simplified_dict.return_value = {
+        "display_name": "Test User",
+        "account_id": "123456",
+        "email": "test@example.com",
+        "active": True,
+    }
+    mock_fetcher.get_user_details.return_value = mock_user_obj
+
     return mock_fetcher
 
 
@@ -117,31 +140,6 @@ def mock_base_confluence_config():
 @pytest.fixture
 def test_confluence_mcp(mock_confluence_fetcher, mock_base_confluence_config):
     """Create a test FastMCP instance with standard configuration."""
-
-<<<<<<< HEAD
-    # Import and register tool functions (as they are in confluence.py)
-    from src.mcp_atlassian.servers.confluence import (
-        add_comment,
-        add_label,
-        create_page,
-        delete_page,
-        get_comments,
-        get_labels,
-        get_page,
-        get_page_children,
-<<<<<<< HEAD
-        get_user_details,
-=======
-        get_page_version,
-        list_page_versions,
->>>>>>> maxheadroom/main
-        search,
-        search_user,
-        update_page,
-    )
-
-=======
->>>>>>> feature/multi-server
     @asynccontextmanager
     async def test_lifespan(app: FastMCP) -> AsyncGenerator[MainAppContext, None]:
         try:
@@ -159,24 +157,7 @@ def test_confluence_mcp(mock_confluence_fetcher, mock_base_confluence_config):
 
     # Create and configure the sub-MCP for Confluence tools
     confluence_sub_mcp = FastMCP(name="TestConfluenceSubMCP")
-<<<<<<< HEAD
-    confluence_sub_mcp.tool()(search)
-    confluence_sub_mcp.tool()(get_page)
-    confluence_sub_mcp.tool()(get_page_children)
-    confluence_sub_mcp.tool()(get_comments)
-    confluence_sub_mcp.tool()(add_comment)
-    confluence_sub_mcp.tool()(get_labels)
-    confluence_sub_mcp.tool()(add_label)
-    confluence_sub_mcp.tool()(create_page)
-    confluence_sub_mcp.tool()(update_page)
-    confluence_sub_mcp.tool()(delete_page)
-    confluence_sub_mcp.tool()(list_page_versions)
-    confluence_sub_mcp.tool()(get_page_version)
-    confluence_sub_mcp.tool()(search_user)
-    confluence_sub_mcp.tool()(get_user_details)
-=======
     register_confluence_tools(confluence_sub_mcp)
->>>>>>> feature/multi-server
 
     test_mcp.mount("confluence", confluence_sub_mcp)
 
@@ -186,27 +167,6 @@ def test_confluence_mcp(mock_confluence_fetcher, mock_base_confluence_config):
 @pytest.fixture
 def no_fetcher_test_confluence_mcp(mock_base_confluence_config):
     """Create a test FastMCP instance that simulates missing Confluence fetcher."""
-
-<<<<<<< HEAD
-    # Import and register tool functions (as they are in confluence.py)
-    from src.mcp_atlassian.servers.confluence import (
-        add_comment,
-        add_label,
-        create_page,
-        delete_page,
-        get_comments,
-        get_labels,
-        get_page,
-        get_page_children,
-        get_page_version,
-        list_page_versions,
-        search,
-        search_user,
-        update_page,
-    )
-
-=======
->>>>>>> feature/multi-server
     @asynccontextmanager
     async def no_fetcher_test_lifespan(
         app: FastMCP,
@@ -226,23 +186,7 @@ def no_fetcher_test_confluence_mcp(mock_base_confluence_config):
 
     # Create and configure the sub-MCP for Confluence tools
     confluence_sub_mcp = FastMCP(name="NoFetcherTestConfluenceSubMCP")
-<<<<<<< HEAD
-    confluence_sub_mcp.tool()(search)
-    confluence_sub_mcp.tool()(get_page)
-    confluence_sub_mcp.tool()(get_page_children)
-    confluence_sub_mcp.tool()(get_comments)
-    confluence_sub_mcp.tool()(add_comment)
-    confluence_sub_mcp.tool()(get_labels)
-    confluence_sub_mcp.tool()(add_label)
-    confluence_sub_mcp.tool()(create_page)
-    confluence_sub_mcp.tool()(update_page)
-    confluence_sub_mcp.tool()(delete_page)
-    confluence_sub_mcp.tool()(list_page_versions)
-    confluence_sub_mcp.tool()(get_page_version)
-    confluence_sub_mcp.tool()(search_user)
-=======
     register_confluence_tools(confluence_sub_mcp)
->>>>>>> feature/multi-server
 
     test_mcp.mount("confluence", confluence_sub_mcp)
 
@@ -381,7 +325,6 @@ async def test_get_page_version(client, mock_confluence_fetcher):
     result_data = json.loads(response[0].text)
     assert "metadata" in result_data
     assert result_data["metadata"]["title"] == "Test Page Mock Title"
-
 
 
 @pytest.mark.anyio
@@ -560,18 +503,15 @@ async def test_update_page_with_numeric_parent_id(client, mock_confluence_fetche
 @pytest.mark.anyio
 async def test_get_user_details_by_userkey(client, mock_confluence_fetcher):
     """Test the confluence_get_user_details tool with userkey."""
-    mock_user_details = {"displayName": "Test User", "userKey": "testuser-key-12345"}
-    mock_confluence_fetcher.get_user_details.return_value = (
-        ConfluenceUser.from_api_response(mock_user_details)
-    )
-
     response = await client.call_tool(
         "confluence_get_user_details",
         {"identifier": "testuser-key-12345", "identifier_type": "userKey"},
     )
 
     result_data = json.loads(response[0].text)
-    assert result_data["display_name"] == "Test User"
+    assert result_data["success"] is True
+    assert "user" in result_data
+    assert result_data["user"]["display_name"] == "Test User"
 
 
 @pytest.mark.anyio
@@ -592,35 +532,29 @@ async def test_get_user_details_invalid_userkey(client, mock_confluence_fetcher)
 @pytest.mark.anyio
 async def test_get_user_details_by_account_id(client, mock_confluence_fetcher):
     """Test the confluence_get_user_details tool with accountId."""
-    mock_user_details = {"displayName": "Test User", "accountId": "12345"}
-    mock_confluence_fetcher.get_user_details.return_value = (
-        ConfluenceUser.from_api_response(mock_user_details)
-    )
-
     response = await client.call_tool(
         "confluence_get_user_details",
         {"identifier": "12345", "identifier_type": "accountId"},
     )
 
     result_data = json.loads(response[0].text)
-    assert result_data["display_name"] == "Test User"
+    assert result_data["success"] is True
+    assert "user" in result_data
+    assert result_data["user"]["display_name"] == "Test User"
 
 
 @pytest.mark.anyio
 async def test_get_user_details_by_username(client, mock_confluence_fetcher):
     """Test the confluence_get_user_details tool with username."""
-    mock_user_details = {"displayName": "Test User", "name": "testuser"}
-    mock_confluence_fetcher.get_user_details.return_value = (
-        ConfluenceUser.from_api_response(mock_user_details)
-    )
-
     response = await client.call_tool(
         "confluence_get_user_details",
         {"identifier": "testuser", "identifier_type": "username"},
     )
 
     result_data = json.loads(response[0].text)
-    assert result_data["display_name"] == "Test User"
+    assert result_data["success"] is True
+    assert "user" in result_data
+    assert result_data["user"]["display_name"] == "Test User"
 
 
 @pytest.mark.anyio

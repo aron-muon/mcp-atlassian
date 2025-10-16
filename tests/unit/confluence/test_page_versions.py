@@ -4,25 +4,84 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastmcp import Context
+from fastmcp import FastMCP
+from fastmcp.client import Client, FastMCPTransport
 
 from mcp_atlassian.models.confluence import ConfluenceVersion
-from mcp_atlassian.servers.confluence import list_page_versions
+from mcp_atlassian.servers.confluence import register_confluence_tools
+from mcp_atlassian.servers.context import MainAppContext
+from mcp_atlassian.servers.main import AtlassianMCP
+from mcp_atlassian.utils.oauth import OAuthConfig
+from mcp_atlassian.confluence.config import ConfluenceConfig
+from mcp_atlassian.confluence import ConfluenceFetcher
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+
+@pytest.fixture
+def mock_confluence_fetcher():
+    """Create a mocked ConfluenceFetcher instance for testing."""
+    mock_fetcher = MagicMock(spec=ConfluenceFetcher)
+
+    # Mock page version methods
+    mock_fetcher.get_page_versions.return_value = [
+        {
+            "number": 1,
+            "when": "2023-01-01T10:00:00.000Z",
+            "message": "Initial version",
+            "minor_edit": False,
+        }
+    ]
+
+    return mock_fetcher
+
+
+@pytest.fixture
+def mock_base_confluence_config():
+    """Create a mock base ConfluenceConfig for MainAppContext using OAuth."""
+    mock_oauth_config = OAuthConfig(
+        client_id="server_client_id",
+        client_secret="server_client_secret",
+        redirect_uri="http://localhost",
+        scope="read:confluence",
+        cloud_id="mock_cloud_id",
+    )
+    return ConfluenceConfig(
+        url="https://mock.atlassian.net/wiki",
+        auth_type="oauth",
+        oauth_config=mock_oauth_config,
+    )
+
+
+@pytest.fixture
+def test_confluence_mcp(mock_base_confluence_config):
+    """Create a test FastMCP instance with standard configuration."""
+    @asynccontextmanager
+    async def test_lifespan(app: FastMCP) -> AsyncGenerator[MainAppContext, None]:
+        try:
+            yield MainAppContext(
+                full_confluence_config=mock_base_confluence_config, read_only=False
+            )
+        finally:
+            pass
+
+    test_mcp = AtlassianMCP(
+        "TestConfluence",
+        description="Test Confluence MCP Server",
+        lifespan=test_lifespan,
+    )
+
+    # Create and configure the sub-MCP for Confluence tools
+    confluence_sub_mcp = FastMCP(name="TestConfluenceSubMCP")
+    register_confluence_tools(confluence_sub_mcp)
+
+    test_mcp.mount("confluence", confluence_sub_mcp)
+
+    return test_mcp
 
 
 class TestPageVersions:
-    """Test page versions functionality."""
-
-    @pytest.fixture
-    def mock_confluence_fetcher(self):
-        """Mock confluence fetcher."""
-        fetcher = MagicMock()
-        return fetcher
-
-    @pytest.fixture
-    def mock_context(self):
-        """Mock FastMCP context."""
-        return MagicMock(spec=Context)
+    """Test page versions functionality through MCP server."""
 
     @pytest.fixture
     def sample_version(self):
@@ -34,35 +93,43 @@ class TestPageVersions:
             minor_edit=False,
         )
 
-    @pytest.mark.asyncio
-    @patch("mcp_atlassian.servers.confluence.get_confluence_fetcher")
-    async def test_list_page_versions_list(
-        self, mock_get_fetcher, mock_context, mock_confluence_fetcher, sample_version
-    ):
-        """Test getting all versions of a page."""
-        mock_get_fetcher.return_value = mock_confluence_fetcher
+    @pytest.mark.anyio
+    async def test_list_page_versions_success(self, test_confluence_mcp, mock_confluence_fetcher, sample_version):
+        """Test getting all versions of a page through MCP server."""
         mock_confluence_fetcher.get_page_versions.return_value = [sample_version]
 
-        result = await list_page_versions(mock_context, "123456")
+        with patch(
+            "mcp_atlassian.servers.confluence.get_confluence_fetcher",
+            return_value=mock_confluence_fetcher,
+        ):
+            async with Client(transport=FastMCPTransport(test_confluence_mcp)) as client:
+                response = await client.call_tool(
+                    "confluence_list_page_versions", {"page_id": "123456"}
+                )
 
-        result_data = json.loads(result)
-        assert "versions" in result_data
-        assert len(result_data["versions"]) == 1
-        assert result_data["versions"][0]["number"] == 1
+        result_data = json.loads(response[0].text)
+        assert "page_id" in result_data
+        assert result_data["page_id"] == "123456"
+        assert "results" in result_data
+        assert len(result_data["results"]) == 1
+        assert result_data["results"][0]["number"] == 1
 
-    @pytest.mark.asyncio
-    @patch("mcp_atlassian.servers.confluence.get_confluence_fetcher")
-    async def test_list_page_versions_error(
-        self, mock_get_fetcher, mock_context, mock_confluence_fetcher
-    ):
-        """Test error handling when getting page versions."""
-        mock_get_fetcher.return_value = mock_confluence_fetcher
-        mock_confluence_fetcher.get_page_versions.side_effect = ValueError(
+    @pytest.mark.anyio
+    async def test_list_page_versions_error(self, test_confluence_mcp, mock_confluence_fetcher):
+        """Test error handling when getting page versions through MCP server."""
+        mock_confluence_fetcher.get_page_versions.side_effect = Exception(
             "Page not found"
         )
 
-        result = await list_page_versions(mock_context, "invalid")
+        with patch(
+            "mcp_atlassian.servers.confluence.get_confluence_fetcher",
+            return_value=mock_confluence_fetcher,
+        ):
+            async with Client(transport=FastMCPTransport(test_confluence_mcp)) as client:
+                response = await client.call_tool(
+                    "confluence_list_page_versions", {"page_id": "invalid"}
+                )
 
-        result_data = json.loads(result)
-        assert result_data["error"] == "operation_failed"
-        assert "Page not found" in result_data["message"]
+        result_data = json.loads(response[0].text)
+        assert "error" in result_data
+        assert "Failed to get page versions" in result_data["error"]

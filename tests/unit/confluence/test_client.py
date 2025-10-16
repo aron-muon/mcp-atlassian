@@ -65,7 +65,7 @@ def test_init_with_token_auth():
         ssl_verify=False,
     )
 
-    # Mock the Confluence class, ConfluencePreprocessor, and configure_ssl_verification
+    # Mock the Confluence class, ConfluencePreprocessor, configure_ssl_verification, and configure_server_pat_auth
     with (
         patch("mcp_atlassian.confluence.client.Confluence") as mock_confluence,
         patch(
@@ -74,14 +74,23 @@ def test_init_with_token_auth():
         patch(
             "mcp_atlassian.confluence.client.configure_ssl_verification"
         ) as mock_configure_ssl,
+        patch("mcp_atlassian.confluence.client.configure_server_pat_auth") as mock_configure_pat,
+        patch("mcp_atlassian.confluence.client.Session") as mock_session_class,
     ):
+        mock_session = MagicMock()
+        mock_session_class.return_value = mock_session
+
         # Act
         client = ConfluenceClient(config=config)
 
         # Assert
+        # Verify server PAT auth was configured
+        mock_configure_pat.assert_called_once_with(mock_session, "test_personal_token")
+
+        # Verify Confluence was called with session (not token) for server instances
         mock_confluence.assert_called_once_with(
             url="https://confluence.example.com",
-            token="test_personal_token",
+            session=mock_session,
             cloud=False,
             verify_ssl=False,
         )

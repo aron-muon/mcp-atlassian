@@ -1,14 +1,11 @@
 """Configuration module for the Confluence client."""
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Literal
 
-<<<<<<< HEAD
-from ..utils.env import get_custom_headers, is_env_ssl_verify
-=======
-from ..utils.env import getenv, is_env_ssl_verify
->>>>>>> feature/multi-server
+from ..utils.env import getenv, get_custom_headers, is_env_ssl_verify
 from ..utils.oauth import (
     BYOAccessTokenOAuthConfig,
     OAuthConfig,

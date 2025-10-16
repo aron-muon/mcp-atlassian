@@ -1192,15 +1192,6 @@ class TestPagesOAuthMixin:
             # Verify result
             assert result is True
 
-<<<<<<< HEAD
-    def test_move_page_oauth_uses_v2_api(self, oauth_pages_mixin):
-        """Test that OAuth authentication uses v2 API for moving pages."""
-        # Arrange
-        page_id = "oauth_move_123"
-        space_key = "PROJ"
-        parent_id = "987654321"
-=======
-
 class TestPagesVersioning:
     """Tests for page versioning functionality."""
 
@@ -1260,7 +1251,6 @@ class TestPagesVersioning:
         """Test getting page content using OAuth (v2 API) without version parameter."""
         # Arrange
         page_id = "oauth_get_123"
->>>>>>> maxheadroom/main
 
         # Mock the v2 adapter
         with patch(
@@ -1268,28 +1258,6 @@ class TestPagesVersioning:
         ) as mock_v2_adapter_class:
             mock_v2_adapter = MagicMock()
             mock_v2_adapter_class.return_value = mock_v2_adapter
-<<<<<<< HEAD
-            mock_v2_adapter.move_page.return_value = True
-
-            # Act
-            result = oauth_pages_mixin.move_page(
-                page_id, space_key=space_key, parent_id=parent_id
-            )
-
-            # Assert that v2 API was used instead of v1
-            mock_v2_adapter.move_page.assert_called_once_with(
-                page_id=page_id,
-                space_key=space_key,
-                parent_id=parent_id,
-                position="append",
-            )
-
-            # Verify v1 API was NOT called
-            oauth_pages_mixin.confluence.move_page.assert_not_called()
-
-            # Verify result
-            assert result is True
-=======
 
             # Mock v2 API response
             mock_v2_adapter.get_page.return_value = {
@@ -1326,4 +1294,3 @@ class TestPagesVersioning:
             assert result.id == page_id
             assert result.title == "OAuth Test Page"
             assert result.content == "Processed Latest content"
->>>>>>> maxheadroom/main

@@ -44,14 +44,33 @@ def is_env_ssl_verify(
     Used for SSL_VERIFY environment variables.
 
     Args:
+        env: Dictionary containing environment variables
         env_var_name: Name of the environment variable to check
         default: Default value if environment variable is not set
 
     Returns:
         True unless explicitly set to false values
     """
-<<<<<<< HEAD
-    return os.getenv(env_var_name, default).lower() not in ("false", "0", "no")
+    return getenv(env, env_var_name, default).lower() not in ("false", "0", "no")
+
+
+def getenv(
+    env: dict[str, str], env_var_name: str, default: str | None = None
+) -> str | None:
+    """Retrieve the value of an environment variable.
+
+    This function checks for the presence of a variable in the provided `env` dictionary first.
+    If the variable is not found in `env`, it falls back to checking the system's environment variables.
+
+    Args:
+        env (dict[str, str]): A dictionary containing environment variables and their values.
+        env_var_name (str): The name of the environment variable to retrieve.
+        default (str | None): Default value if environment variable is not set
+
+    Returns:
+        str | None: The value of the environment variable if found, otherwise None.
+    """
+    return env.get(env_var_name, os.getenv(env_var_name, default))
 
 
 def get_custom_headers(env_var_name: str) -> dict[str, str]:
@@ -65,10 +84,10 @@ def get_custom_headers(env_var_name: str) -> dict[str, str]:
 
     Examples:
         >>> # With CUSTOM_HEADERS="X-Custom=value1,X-Other=value2"
-        >>> parse_custom_headers("CUSTOM_HEADERS")
+        >>> get_custom_headers("CUSTOM_HEADERS")
         {'X-Custom': 'value1', 'X-Other': 'value2'}
         >>> # With unset environment variable
-        >>> parse_custom_headers("UNSET_VAR")
+        >>> get_custom_headers("UNSET_VAR")
         {}
     """
     header_string = os.getenv(env_var_name)
@@ -94,24 +113,3 @@ def get_custom_headers(env_var_name: str) -> dict[str, str]:
             headers[key] = value
 
     return headers
-=======
-    return getenv(env, env_var_name, default).lower() not in ("false", "0", "no")
-
-
-def getenv(
-    env: dict[str, str], env_var_name: str, default: str | None = None
-) -> str | None:
-    """Retrieve the value of an environment variable.
-
-    This function checks for the presence of a variable in the provided `env` dictionary first.
-    If the variable is not found in `env`, it falls back to checking the system's environment variables.
-
-    Args:
-        env (dict[str, str]): A dictionary containing environment variables and their values.
-        env_var_name (str): The name of the environment variable to retrieve.
-
-    Returns:
-        str | None: The value of the environment variable if found, otherwise None.
-    """
-    return env.get(env_var_name, os.getenv(env_var_name, default))
->>>>>>> feature/multi-server

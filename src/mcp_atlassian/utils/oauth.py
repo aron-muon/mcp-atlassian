@@ -444,16 +444,10 @@ class BYOAccessTokenOAuthConfig:
             BYOAccessTokenOAuthConfig instance or None if required
             environment variables are missing.
         """
-<<<<<<< HEAD
-
-        access_token = os.getenv("ATLASSIAN_OAUTH_ACCESS_TOKEN")
-        cloud_id = os.getenv("ATLASSIAN_OAUTH_CLOUD_ID") or get_cloud_id(access_token)
-=======
         if env is None:
             env = {}
         cloud_id = getenv(env, "ATLASSIAN_OAUTH_CLOUD_ID")
         access_token = getenv(env, "ATLASSIAN_OAUTH_ACCESS_TOKEN")
->>>>>>> feature/multi-server
 
         if not all([cloud_id, access_token]):
             return None
@@ -461,7 +455,6 @@ class BYOAccessTokenOAuthConfig:
         return cls(cloud_id=cloud_id, access_token=access_token)
 
 
-<<<<<<< HEAD
 def get_cloud_id(access_token: str) -> str | None:
     """Get the cloud ID for the Atlassian instance.
 
@@ -491,12 +484,9 @@ def get_cloud_id(access_token: str) -> str | None:
         return None
 
 
-def get_oauth_config_from_env() -> OAuthConfig | BYOAccessTokenOAuthConfig | None:
-=======
 def get_oauth_config_from_env(
     env: dict[str, str] = None,
 ) -> OAuthConfig | BYOAccessTokenOAuthConfig | None:
->>>>>>> feature/multi-server
     """Get the appropriate OAuth configuration from environment variables.
 
     This function attempts to load standard OAuth configuration first (OAuthConfig).

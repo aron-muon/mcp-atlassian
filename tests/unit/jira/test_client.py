@@ -69,7 +69,12 @@ def test_init_with_token_auth():
         patch(
             "mcp_atlassian.jira.client.configure_ssl_verification"
         ) as mock_configure_ssl,
+        patch("mcp_atlassian.jira.client.configure_server_pat_auth") as mock_configure_pat,
+        patch("mcp_atlassian.jira.client.Session") as mock_session_class,
     ):
+        mock_session = MagicMock()
+        mock_session_class.return_value = mock_session
+
         config = JiraConfig(
             url="https://jira.example.com",
             auth_type="pat",
@@ -79,10 +84,13 @@ def test_init_with_token_auth():
 
         client = JiraClient(config=config)
 
-        # Verify Jira was initialized correctly
+        # Verify server PAT auth was configured
+        mock_configure_pat.assert_called_once_with(mock_session, "test_personal_token")
+
+        # Verify Jira was initialized with session (not token) for server instances
         mock_jira.assert_called_once_with(
             url="https://jira.example.com",
-            token="test_personal_token",
+            session=mock_session,
             cloud=False,
             verify_ssl=False,
         )

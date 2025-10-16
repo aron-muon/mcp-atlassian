@@ -1,14 +1,11 @@
 """Configuration module for Jira API interactions."""
 
 import logging
+import os
 from dataclasses import dataclass
 from typing import Literal
 
-<<<<<<< HEAD
-from ..utils.env import get_custom_headers, is_env_ssl_verify
-=======
-from ..utils.env import getenv, is_env_ssl_verify
->>>>>>> feature/multi-server
+from ..utils.env import getenv, get_custom_headers, is_env_ssl_verify
 from ..utils.oauth import (
     BYOAccessTokenOAuthConfig,
     OAuthConfig,
@@ -39,15 +36,12 @@ class JiraConfig:
     no_proxy: str | None = None  # Comma-separated list of hosts to bypass proxy
     socks_proxy: str | None = None  # SOCKS proxy URL (optional)
     custom_headers: dict[str, str] | None = None  # Custom HTTP headers
-<<<<<<< HEAD
     disable_jira_markup_translation: bool = (
         False  # Disable automatic markup translation between formats
     )
-=======
     client_cert: str | None = None  # Client certificate file path (.pem)
     client_key: str | None = None  # Client private key file path (.pem)
     client_key_password: str | None = None  # Password for encrypted private key
->>>>>>> feature/client-certificate-auth
 
     @property
     def is_cloud(self) -> bool:
@@ -145,17 +139,15 @@ class JiraConfig:
         # Custom headers - service-specific only
         custom_headers = get_custom_headers("JIRA_CUSTOM_HEADERS")
 
-<<<<<<< HEAD
         # Markup translation setting
         disable_jira_markup_translation = (
             os.getenv("DISABLE_JIRA_MARKUP_TRANSLATION", "false").lower() == "true"
         )
-=======
+
         # Client certificate settings
         client_cert = os.getenv("JIRA_CLIENT_CERT")
         client_key = os.getenv("JIRA_CLIENT_KEY")
         client_key_password = os.getenv("JIRA_CLIENT_KEY_PASSWORD")
->>>>>>> feature/client-certificate-auth
 
         return cls(
             url=url,
@@ -171,13 +163,10 @@ class JiraConfig:
             no_proxy=no_proxy,
             socks_proxy=socks_proxy,
             custom_headers=custom_headers,
-<<<<<<< HEAD
             disable_jira_markup_translation=disable_jira_markup_translation,
-=======
             client_cert=client_cert,
             client_key=client_key,
             client_key_password=client_key_password,
->>>>>>> feature/client-certificate-auth
         )
 
     def is_auth_configured(self) -> bool:
