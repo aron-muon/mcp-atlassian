@@ -205,6 +205,7 @@ def test_is_cloud_oauth_with_cloud_id():
     assert config.is_cloud is True
 
 
+<<<<<<< HEAD
 def test_from_env_oauth_enable_no_url():
     """Test BYOT OAuth mode - ATLASSIAN_OAUTH_ENABLE=true without URL or cloud_id."""
     with patch.dict(
@@ -260,10 +261,50 @@ def test_from_env_oauth_enable_with_server_url():
         {
             "ATLASSIAN_OAUTH_ENABLE": "true",
             "JIRA_URL": "https://jira.example.com",
+=======
+def test_from_env_with_client_cert():
+    """Test loading config with client certificate settings from environment."""
+    with patch.dict(
+        "os.environ",
+        {
+            "JIRA_URL": "https://jira.example.com",
+            "JIRA_USERNAME": "test_user",
+            "JIRA_API_TOKEN": "test_token",
+            "JIRA_CLIENT_CERT": "/path/to/cert.pem",
+            "JIRA_CLIENT_KEY": "/path/to/key.pem",
+            "JIRA_CLIENT_KEY_PASSWORD": "secret",
+>>>>>>> feature/client-certificate-auth
         },
         clear=True,
     ):
         config = JiraConfig.from_env()
+<<<<<<< HEAD
         assert config.url == "https://jira.example.com"
         assert config.auth_type == "oauth"
         assert config.is_cloud is False
+=======
+
+        assert config.url == "https://jira.example.com"
+        assert config.client_cert == "/path/to/cert.pem"
+        assert config.client_key == "/path/to/key.pem"
+        assert config.client_key_password == "secret"
+
+
+def test_from_env_without_client_cert():
+    """Test loading config without client certificate settings."""
+    with patch.dict(
+        "os.environ",
+        {
+            "JIRA_URL": "https://jira.example.com",
+            "JIRA_USERNAME": "test_user",
+            "JIRA_API_TOKEN": "test_token",
+        },
+        clear=True,
+    ):
+        config = JiraConfig.from_env()
+
+        assert config.url == "https://jira.example.com"
+        assert config.client_cert is None
+        assert config.client_key is None
+        assert config.client_key_password is None
+>>>>>>> feature/client-certificate-auth
