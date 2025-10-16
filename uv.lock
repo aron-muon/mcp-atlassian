@@ -1,9 +1,13 @@
 version = 1
 <<<<<<< HEAD
+<<<<<<< HEAD
 revision = 2
 =======
 revision = 3
 >>>>>>> feature/informative-error-messages
+=======
+revision = 1
+>>>>>>> feat/jira-custom-field-options
 requires-python = ">=3.10"
 
 [[package]]
