@@ -111,6 +111,7 @@ def mock_jira_fetcher():
         description=None,
         assignee=None,
         components=None,
+        priority=None,
         **additional_fields,
     ):
         if not project_key or project_key.strip() == "":
@@ -133,6 +134,8 @@ def mock_jira_fetcher():
             else [],
             **additional_fields,
         }
+        if priority:
+            response_data["priority"] = {"name": priority}
         mock_issue.to_simplified_dict.return_value = response_data
         return mock_issue
 
@@ -408,14 +411,13 @@ async def test_get_issue_invalid_key(jira_client, mock_jira_fetcher):
     """Test that get_issue fails when a key does not exist and provides an informative error."""
     mock_jira_fetcher.get_issue.side_effect = ValueError("Issue Does Not Exist")
 
-    with pytest.raises(ToolError) as excinfo:
-        await jira_client.call_tool(
-            "jira_get_issue",
-            {
-                "issue_key": "FAIL-123",
-                "fields": "summary,description,status",
-            },
-        )
+    response = await jira_client.call_tool(
+        "jira_get_issue",
+        {
+            "issue_key": "FAIL-123",
+            "fields": "summary,description,status",
+        },
+    )
 
     mock_jira_fetcher.get_issue.assert_called_once_with(
         issue_key="FAIL-123",
@@ -426,19 +428,21 @@ async def test_get_issue_invalid_key(jira_client, mock_jira_fetcher):
         update_history=True,
     )
 
-    assert "Error calling tool 'get_issue': Issue Does Not Exist" in str(excinfo.value)
+    result_data = json.loads(response[0].text)
+    assert result_data["success"] is False
+    assert "Issue Does Not Exist" in result_data["error"]
 
 
 @pytest.mark.anyio
 async def test_search(jira_client, mock_jira_fetcher):
     """Test the search tool with fixture data."""
     response = await jira_client.call_tool(
-        "jira_search",
+        "jira_search_issues",
         {
             "jql": "project = TEST",
             "fields": "summary,status",
             "limit": 10,
-            "start_at": 0,
+            "start": 0,
         },
     )
     assert isinstance(response, list)
@@ -447,19 +451,19 @@ async def test_search(jira_client, mock_jira_fetcher):
     assert text_content.type == "text"
     content = json.loads(text_content.text)
     assert isinstance(content, dict)
-    assert "issues" in content
-    assert isinstance(content["issues"], list)
-    assert len(content["issues"]) >= 1
-    assert content["issues"][0]["key"] == "PROJ-123"
-    assert content["total"] > 0
-    assert content["start_at"] == 0
-    assert content["max_results"] == 10
+    assert content["success"] is True
+    assert "search_results" in content
+    assert isinstance(content["search_results"]["issues"], list)
+    assert len(content["search_results"]["issues"]) >= 1
+    assert content["search_results"]["issues"][0]["key"] == "PROJ-123"
+    assert content["search_results"]["total"] > 0
+    assert content["search_results"]["start_at"] == 0
+    assert content["search_results"]["max_results"] == 10
     mock_jira_fetcher.search_issues.assert_called_once_with(
         jql="project = TEST",
         fields=["summary", "status"],
-        limit=10,
         start=0,
-        projects_filter=None,
+        limit=10,
         expand=None,
     )
 
@@ -475,7 +479,7 @@ async def test_create_issue(jira_client, mock_jira_fetcher):
             "issue_type": "Task",
             "description": "This is a new task",
             "components": "Frontend,API",
-            "additional_fields": {"priority": {"name": "Medium"}},
+            "priority": "Medium",
         },
     )
     assert isinstance(response, list)
@@ -483,7 +487,7 @@ async def test_create_issue(jira_client, mock_jira_fetcher):
     text_content = response[0]
     assert text_content.type == "text"
     content = json.loads(text_content.text)
-    assert content["message"] == "Issue created successfully"
+    assert content["success"] is True
     assert "issue" in content
     assert content["issue"]["key"] == "TEST-456"
     assert content["issue"]["summary"] == "New Issue"
@@ -492,7 +496,7 @@ async def test_create_issue(jira_client, mock_jira_fetcher):
     component_names = [comp["name"] for comp in content["issue"]["components"]]
     assert "Frontend" in component_names
     assert "API" in component_names
-    assert content["issue"]["priority"] == {"name": "Medium"}
+    assert content["issue"]["priority"] == {"name": {"name": "Medium"}}
     mock_jira_fetcher.create_issue.assert_called_once_with(
         project_key="TEST",
         summary="New Issue",
@@ -500,6 +504,7 @@ async def test_create_issue(jira_client, mock_jira_fetcher):
         description="This is a new task",
         assignee=None,
         components=["Frontend", "API"],
+        reporter=None,
         priority={"name": "Medium"},
     )
 

@@ -104,7 +104,22 @@ def mock_confluence_fetcher():
         }
     ]
 
-    # Mock get_page_version method
+    # Mock get_page_version method - need a separate mock object
+    mock_page_version = MagicMock(spec=ConfluencePage)
+    mock_page_version.to_simplified_dict.return_value = {
+        "id": "123456",
+        "title": "Test Page Mock Title",
+        "url": "https://example.atlassian.net/wiki/spaces/TEST/pages/123456/Test+Page",
+        "version": {"number": 5},
+        "content": {
+            "value": "This is a test page content in Markdown",
+            "format": "markdown",
+        },
+    }
+    mock_page_version.content = "This is a test page content in Markdown"
+    mock_fetcher.get_page_version.return_value = mock_page_version
+
+    # Mock get_page_content method (for regular page content)
     mock_fetcher.get_page_content.return_value = mock_page
 
     # Mock user details methods - need to return ConfluenceUser object
@@ -318,13 +333,15 @@ async def test_get_page_version(client, mock_confluence_fetcher):
         "confluence_get_page_version", {"page_id": "123456", "version_number": 5}
     )
 
-    mock_confluence_fetcher.get_page_content.assert_called_once_with(
-        "123456", convert_to_markdown=True, version=5
+    mock_confluence_fetcher.get_page_version.assert_called_once_with(
+        page_id="123456", version_number=5, expand="content", convert_to_markdown=True
     )
 
     result_data = json.loads(response[0].text)
-    assert "metadata" in result_data
-    assert result_data["metadata"]["title"] == "Test Page Mock Title"
+    assert "success" in result_data
+    assert result_data["success"] is True
+    assert "version" in result_data
+    assert result_data["version"]["title"] == "Test Page Mock Title"
 
 
 @pytest.mark.anyio
