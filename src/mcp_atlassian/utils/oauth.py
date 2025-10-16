@@ -9,7 +9,6 @@ It handles:
 
 import json
 import logging
-import os
 import pprint
 import time
 import urllib.parse
@@ -19,6 +18,8 @@ from typing import Any, Optional
 
 import keyring
 import requests
+
+from ..utils.env import getenv
 
 # Configure logging
 logger = logging.getLogger("mcp-atlassian.oauth")
@@ -353,24 +354,26 @@ class OAuthConfig:
             return {}
 
     @classmethod
-    def from_env(cls) -> Optional["OAuthConfig"]:
+    def from_env(cls, env: dict[str, str] = None) -> Optional["OAuthConfig"]:
         """Create an OAuth configuration from environment variables.
 
         Returns:
             OAuthConfig instance or None if OAuth is not enabled
         """
+        if env is None:
+            env = {}
         # Check if OAuth is explicitly enabled (allows minimal config)
-        oauth_enabled = os.getenv("ATLASSIAN_OAUTH_ENABLE", "").lower() in (
+        oauth_enabled = getenv(env, "ATLASSIAN_OAUTH_ENABLE", "").lower() in (
             "true",
             "1",
             "yes",
         )
 
         # Check for required environment variables
-        client_id = os.getenv("ATLASSIAN_OAUTH_CLIENT_ID")
-        client_secret = os.getenv("ATLASSIAN_OAUTH_CLIENT_SECRET")
-        redirect_uri = os.getenv("ATLASSIAN_OAUTH_REDIRECT_URI")
-        scope = os.getenv("ATLASSIAN_OAUTH_SCOPE")
+        client_id = getenv(env, "ATLASSIAN_OAUTH_CLIENT_ID")
+        client_secret = getenv(env, "ATLASSIAN_OAUTH_CLIENT_SECRET")
+        redirect_uri = getenv(env, "ATLASSIAN_OAUTH_REDIRECT_URI")
+        scope = getenv(env, "ATLASSIAN_OAUTH_SCOPE")
 
         # Full OAuth configuration (traditional mode)
         if all([client_id, client_secret, redirect_uri, scope]):
@@ -380,7 +383,7 @@ class OAuthConfig:
                 client_secret=client_secret,
                 redirect_uri=redirect_uri,
                 scope=scope,
-                cloud_id=os.getenv("ATLASSIAN_OAUTH_CLOUD_ID"),
+                cloud_id=getenv(env, "ATLASSIAN_OAUTH_CLOUD_ID"),
             )
 
             # Try to load existing tokens
@@ -405,7 +408,7 @@ class OAuthConfig:
                 client_secret="",  # Not needed for user tokens
                 redirect_uri="",  # Not needed for user tokens
                 scope="",  # Will be determined by user token permissions
-                cloud_id=os.getenv("ATLASSIAN_OAUTH_CLOUD_ID"),  # Optional fallback
+                cloud_id=getenv(env, "ATLASSIAN_OAUTH_CLOUD_ID"),  # Optional fallback
             )
 
         # No OAuth configuration
@@ -430,7 +433,9 @@ class BYOAccessTokenOAuthConfig:
     expires_at: None = None
 
     @classmethod
-    def from_env(cls) -> Optional["BYOAccessTokenOAuthConfig"]:
+    def from_env(
+        cls, env: dict[str, str] = None
+    ) -> Optional["BYOAccessTokenOAuthConfig"]:
         """Create a BYOAccessTokenOAuthConfig from environment variables.
 
         Reads `ATLASSIAN_OAUTH_CLOUD_ID` and `ATLASSIAN_OAUTH_ACCESS_TOKEN`.
@@ -439,9 +444,16 @@ class BYOAccessTokenOAuthConfig:
             BYOAccessTokenOAuthConfig instance or None if required
             environment variables are missing.
         """
+<<<<<<< HEAD
 
         access_token = os.getenv("ATLASSIAN_OAUTH_ACCESS_TOKEN")
         cloud_id = os.getenv("ATLASSIAN_OAUTH_CLOUD_ID") or get_cloud_id(access_token)
+=======
+        if env is None:
+            env = {}
+        cloud_id = getenv(env, "ATLASSIAN_OAUTH_CLOUD_ID")
+        access_token = getenv(env, "ATLASSIAN_OAUTH_ACCESS_TOKEN")
+>>>>>>> feature/multi-server
 
         if not all([cloud_id, access_token]):
             return None
@@ -449,6 +461,7 @@ class BYOAccessTokenOAuthConfig:
         return cls(cloud_id=cloud_id, access_token=access_token)
 
 
+<<<<<<< HEAD
 def get_cloud_id(access_token: str) -> str | None:
     """Get the cloud ID for the Atlassian instance.
 
@@ -479,6 +492,11 @@ def get_cloud_id(access_token: str) -> str | None:
 
 
 def get_oauth_config_from_env() -> OAuthConfig | BYOAccessTokenOAuthConfig | None:
+=======
+def get_oauth_config_from_env(
+    env: dict[str, str] = None,
+) -> OAuthConfig | BYOAccessTokenOAuthConfig | None:
+>>>>>>> feature/multi-server
     """Get the appropriate OAuth configuration from environment variables.
 
     This function attempts to load standard OAuth configuration first (OAuthConfig).
@@ -489,7 +507,7 @@ def get_oauth_config_from_env() -> OAuthConfig | BYOAccessTokenOAuthConfig | Non
         An instance of OAuthConfig or BYOAccessTokenOAuthConfig if environment
         variables are set for either, otherwise None.
     """
-    return BYOAccessTokenOAuthConfig.from_env() or OAuthConfig.from_env()
+    return BYOAccessTokenOAuthConfig.from_env(env) or OAuthConfig.from_env(env)
 
 
 def configure_oauth_session(

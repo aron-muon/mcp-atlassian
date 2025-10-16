@@ -15,6 +15,7 @@ from starlette.requests import Request
 from src.mcp_atlassian.jira import JiraFetcher
 from src.mcp_atlassian.jira.config import JiraConfig
 from src.mcp_atlassian.servers.context import MainAppContext
+from src.mcp_atlassian.servers.jira import register_jira_tools
 from src.mcp_atlassian.servers.main import AtlassianMCP
 from src.mcp_atlassian.utils.oauth import OAuthConfig
 from tests.fixtures.jira_mocks import (
@@ -292,6 +293,7 @@ def test_jira_mcp(mock_jira_fetcher, mock_base_jira_config):
     test_mcp = AtlassianMCP(
         "TestJira", description="Test Jira MCP Server", lifespan=test_lifespan
     )
+<<<<<<< HEAD
     from src.mcp_atlassian.servers.jira import (
         add_comment,
         add_issues_to_sprint,
@@ -354,6 +356,11 @@ def test_jira_mcp(mock_jira_fetcher, mock_base_jira_config):
     jira_sub_mcp.tool()(add_issues_to_sprint)
     jira_sub_mcp.tool()(update_sprint)
     jira_sub_mcp.tool()(batch_create_versions)
+=======
+
+    jira_sub_mcp = FastMCP(name="TestJiraSubMCP")
+    register_jira_tools(jira_sub_mcp)
+>>>>>>> feature/multi-server
     test_mcp.mount("jira", jira_sub_mcp)
     return test_mcp
 
@@ -376,10 +383,9 @@ def no_fetcher_test_jira_mcp(mock_base_jira_config):
         description="No Fetcher Test Jira MCP Server",
         lifespan=no_fetcher_test_lifespan,
     )
-    from src.mcp_atlassian.servers.jira import get_issue
 
     jira_sub_mcp = FastMCP(name="NoFetcherTestJiraSubMCP")
-    jira_sub_mcp.tool()(get_issue)
+    register_jira_tools(jira_sub_mcp)
     test_mcp.mount("jira", jira_sub_mcp)
     return test_mcp
 
