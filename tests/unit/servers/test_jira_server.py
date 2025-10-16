@@ -549,6 +549,7 @@ async def test_create_issue(jira_client, mock_jira_fetcher):
 
 
 @pytest.mark.anyio
+<<<<<<< HEAD
 async def test_create_issue_accepts_json_string(jira_client, mock_jira_fetcher):
     """Ensure additional_fields can be a JSON string."""
     payload = {
@@ -571,6 +572,27 @@ async def test_create_issue_accepts_json_string(jira_client, mock_jira_fetcher):
         components=None,
         labels=["ai", "test"],
     )
+=======
+async def test_create_issue_error_handling(jira_client, mock_jira_fetcher):
+    """Test that create_issue surfaces errors in a structured JSON response."""
+    # Simulate error by passing an invalid project_key (empty string)
+    response = await jira_client.call_tool(
+        "jira_create_issue",
+        {
+            "project_key": "",  # Invalid project key
+            "summary": "Should Fail",
+            "issue_type": "Task",
+            "description": "This should trigger an error",
+        },
+    )
+    assert isinstance(response, list)
+    assert len(response) > 0
+    text_content = response[0]
+    assert text_content.type == "text"
+    content = json.loads(text_content.text)
+    assert "error" in content
+    assert "valid project is required" in content["error"]
+>>>>>>> anders/fix-throw-error
 
 
 @pytest.mark.anyio

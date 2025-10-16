@@ -741,6 +741,7 @@ async def create_issue(
             comp.strip() for comp in components.split(",") if comp.strip()
         ]
 
+<<<<<<< HEAD
     # Use additional_fields directly as dict
     # Accept either dict or JSON string for additional fields
     if additional_fields is None:
@@ -760,14 +761,26 @@ async def create_issue(
         raise ValueError("additional_fields must be a dictionary or JSON string.")
 
     try:
+=======
+    try:
+        # Ensure description is a string, not None
+        description_str = description if description is not None else ""
+>>>>>>> anders/fix-throw-error
         issue = jira.create_issue(
             project_key=project_key,
             summary=summary,
             issue_type=issue_type,
+<<<<<<< HEAD
             description=description,
             assignee=assignee,
             components=components_list,
             **extra_fields,
+=======
+            description=description_str,
+            assignee=assignee,
+            components=components_list,
+            **(additional_fields or {}),
+>>>>>>> anders/fix-throw-error
         )
         result = issue.to_simplified_dict()
         return json.dumps(
@@ -776,6 +789,7 @@ async def create_issue(
             ensure_ascii=False,
         )
     except Exception as e:
+<<<<<<< HEAD
         # Enhanced error handling with detailed information
         error_msg = f"Failed to create JIRA issue: {str(e)}"
 
@@ -882,6 +896,13 @@ async def create_issue(
                 )
 
         return json.dumps(error_response, indent=2, ensure_ascii=False)
+=======
+        logger.error(
+            f"Error creating issue in project {project_key}: {str(e)}", exc_info=True
+        )
+        # Surface the error directly to the agent in a structured way
+        return json.dumps({"error": str(e)})
+>>>>>>> anders/fix-throw-error
 
 
 @jira_mcp.tool(tags={"jira", "write"})
