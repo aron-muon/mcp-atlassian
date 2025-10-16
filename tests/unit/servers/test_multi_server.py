@@ -455,8 +455,10 @@ async def test_get_issue(jira_client, mock_jira_fetcher):
     text_content = response[0]
     assert text_content.type == "text"
     content = json.loads(text_content.text)
-    assert content["key"] == "TEST-123"
-    assert content["summary"] == "Test Issue Summary"
+    assert content["success"] is True
+    assert "issue" in content
+    assert content["issue"]["key"] == "TEST-123"
+    assert content["issue"]["summary"] == "Test Issue Summary"
     mock_jira_fetcher.get_issue.assert_called_once_with(
         issue_key="TEST-123",
         fields=["summary", "description", "status"],

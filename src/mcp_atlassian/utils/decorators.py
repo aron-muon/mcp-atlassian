@@ -16,39 +16,59 @@ logger = logging.getLogger(__name__)
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
 
 
-def check_write_access(service_name: str) -> Callable:
+def check_write_access(service_name_or_func: str | F = "Service") -> Callable:
     """
     Decorator for FastMCP tools to check if the application is in read-only mode.
     If in read-only mode, it raises a ValueError.
     Assumes the decorated function is async and has `ctx: Context` as its first argument.
 
+    Can be used in two ways:
+    1. @check_write_access (uses default service name "Service")
+    2. @check_write_access("Jira") (specifies service name)
+
     Args:
-        service_name: Name of the service for error messages (e.g., "Jira", "Confluence")
+        service_name_or_func: Either the service name or the function being decorated
     """
 
-    def decorator(func: F) -> F:
-        @wraps(func)
-        async def wrapper(ctx: Context, *args: Any, **kwargs: Any) -> Any:
-            lifespan_ctx_dict = ctx.request_context.lifespan_context
-            app_lifespan_ctx = (
-                lifespan_ctx_dict.get("app_lifespan_context")
-                if isinstance(lifespan_ctx_dict, dict)
-                else None
-            )  # type: ignore
+    # Check if this is being called as @check_write_access (without parameters)
+    if callable(service_name_or_func):
+        # Direct decorator usage: @check_write_access
+        func = service_name_or_func
+        service_name = "Service"
+    else:
+        # Parameterized decorator usage: @check_write_access("Jira")
+        service_name = service_name_or_func
+        # Return the actual decorator that will be applied to the function
+        def decorator(func: F) -> F:
+            return _create_wrapper(func, service_name)
+        return decorator
 
-            if app_lifespan_ctx is not None and app_lifespan_ctx.read_only:
-                tool_name = func.__name__
-                action_description = tool_name.replace(
-                    "_", " "
-                )  # e.g., "create_issue" -> "create issue"
-                logger.warning(f"Attempted to call tool '{tool_name}' in read-only mode.")
-                raise ValueError(f"Cannot {action_description} in read-only mode for {service_name}.")
+    # For direct usage, create and return the wrapped function
+    return _create_wrapper(func, service_name)
 
-            return await func(ctx, *args, **kwargs)
 
-        return wrapper  # type: ignore
+def _create_wrapper(func: F, service_name: str) -> F:
+    """Create the actual wrapper function for check_write_access."""
+    @wraps(func)
+    async def wrapper(ctx: Context, *args: Any, **kwargs: Any) -> Any:
+        lifespan_ctx_dict = ctx.request_context.lifespan_context
+        app_lifespan_ctx = (
+            lifespan_ctx_dict.get("app_lifespan_context")
+            if isinstance(lifespan_ctx_dict, dict)
+            else None
+        )  # type: ignore
 
-    return decorator
+        if app_lifespan_ctx is not None and app_lifespan_ctx.read_only:
+            tool_name = func.__name__
+            action_description = tool_name.replace(
+                "_", " "
+            )  # e.g., "create_issue" -> "create issue"
+            logger.warning(f"Attempted to call tool '{tool_name}' in read-only mode.")
+            raise ValueError(f"Cannot {action_description} in read-only mode for {service_name}.")
+
+        return await func(ctx, *args, **kwargs)
+
+    return wrapper  # type: ignore
 
 
 def handle_atlassian_api_errors(service_name: str = "Atlassian API") -> Callable:
