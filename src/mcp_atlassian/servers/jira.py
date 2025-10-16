@@ -343,7 +343,44 @@ async def get_transitions(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+<<<<<<< HEAD
 @handle_tool_errors(default_return_key="worklogs", service_name="Jira")
+=======
+async def get_comments(
+    ctx: Context,
+    issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
+    limit: Annotated[
+        int,
+        Field(
+            description="Maximum number of comments to retrieve",
+            default=50,
+            ge=1,
+            le=1000,
+        ),
+    ] = 50,
+) -> str:
+    """Get comments for a specific Jira issue.
+
+    Args:
+        ctx: The FastMCP context.
+        issue_key: Jira issue key.
+        limit: Maximum number of comments to retrieve (1-1000, default 50).
+
+    Returns:
+        JSON string representing the comments with author, creation date, and content.
+    """
+    jira = await get_jira_fetcher(ctx)
+    comments = jira.get_issue_comments(issue_key=issue_key, limit=limit)
+    result = {
+        "issue_key": issue_key,
+        "total_comments": len(comments),
+        "comments": comments,
+    }
+    return json.dumps(result, indent=2, ensure_ascii=False)
+
+
+@jira_mcp.tool(tags={"jira", "read"})
+>>>>>>> suparious/main
 async def get_worklog(
     ctx: Context,
     issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
@@ -1829,7 +1866,69 @@ async def get_project_versions(
 
 
 @jira_mcp.tool(tags={"jira", "read"})
+<<<<<<< HEAD
 @handle_tool_errors(default_return_key="projects", service_name="Jira")
+=======
+async def get_development_information(
+    ctx: Context,
+    issue_key: Annotated[str, Field(description="Jira issue key (e.g., 'PROJ-123')")],
+    application_type: Annotated[
+        str | None,
+        Field(
+            description=(
+                "(Optional) Filter by application type: 'stash' (Bitbucket Server), "
+                "'bitbucket' (Bitbucket Cloud), 'github', or 'gitlab'"
+            ),
+            default=None,
+        ),
+    ] = None,
+) -> str:
+    """Get development information (pull requests, branches, commits) linked to a Jira issue.
+    
+    This retrieves information from development tools integrated with Jira through plugins
+    like Bitbucket for Jira, GitHub for Jira, or GitLab for Jira.
+    
+    Args:
+        ctx: The FastMCP context.
+        issue_key: The Jira issue key.
+        application_type: Optional filter by integration type.
+    
+    Returns:
+        JSON string containing linked pull requests, branches, commits, and builds.
+    
+    Raises:
+        ValueError: If the issue key is invalid or Jira client unavailable.
+    """
+    jira = await get_jira_fetcher(ctx)
+    
+    try:
+        dev_info = jira.get_development_information(
+            issue_key=issue_key,
+            application_type=application_type
+        )
+        
+        # Convert to dict representation
+        result = dev_info.to_dict()
+        result["issue_key"] = issue_key
+        
+        return json.dumps(result, indent=2, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"Failed to get development information for {issue_key}: {e}")
+        # Return empty development info on error
+        return json.dumps({
+            "issue_key": issue_key,
+            "has_development_info": False,
+            "errors": [str(e)],
+            "pull_requests": [],
+            "branches": [],
+            "commits": [],
+            "builds": [],
+            "summary": "Failed to retrieve development information"
+        }, indent=2, ensure_ascii=False)
+
+
+@jira_mcp.tool(tags={"jira", "read"})
+>>>>>>> suparious/main
 async def get_all_projects(
     ctx: Context,
     include_archived: Annotated[
