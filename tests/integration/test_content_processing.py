@@ -41,10 +41,9 @@ def jira_preprocessor():
 
 @pytest.fixture
 def confluence_preprocessor():
-    """Create a ConfluencePreprocessor instance with mock client."""
+    """Create a ConfluencePreprocessor instance."""
     return ConfluencePreprocessor(
-        base_url="https://example.atlassian.net",
-        confluence_client=MockConfluenceClient(),
+        base_url="https://example.atlassian.net"
     )
 
 
@@ -389,8 +388,9 @@ def process():
     </ac:rich-text-body>
 </ac:structured-macro>"""
 
+        mock_client = MockConfluenceClient()
         processed_html, processed_markdown = (
-            confluence_preprocessor.process_html_content(html_with_macros)
+            confluence_preprocessor.process_html_content(html_with_macros, confluence_client=mock_client)
         )
 
         # Verify macros are preserved in HTML
@@ -429,8 +429,9 @@ def process():
     </ac:parameter>
 </ac:structured-macro>"""
 
+        mock_client = MockConfluenceClient()
         processed_html, processed_markdown = (
-            confluence_preprocessor.process_html_content(html_content)
+            confluence_preprocessor.process_html_content(html_content, confluence_client=mock_client)
         )
 
         # Verify all user mentions are processed
@@ -492,8 +493,9 @@ Math: x² + y² = z²"""
         )
 
         # Process the storage format
+        mock_client = MockConfluenceClient()
         processed_html, processed_markdown = (
-            confluence_preprocessor.process_html_content(storage_format)
+            confluence_preprocessor.process_html_content(storage_format, confluence_client=mock_client)
         )
 
         # Verify key elements are preserved
@@ -626,8 +628,9 @@ def function_{i}():
 
         # Test processing performance
         start_time = time.time()
+        mock_client = MockConfluenceClient()
         processed_html, processed_markdown = (
-            confluence_preprocessor.process_html_content(large_content)
+            confluence_preprocessor.process_html_content(large_content, confluence_client=mock_client)
         )
         processing_time = time.time() - start_time
 
@@ -690,8 +693,9 @@ def function_{i}():
     </div>
 </div>"""
 
+        mock_client = MockConfluenceClient()
         processed_html, processed_markdown = (
-            confluence_preprocessor.process_html_content(nested_html)
+            confluence_preprocessor.process_html_content(nested_html, confluence_client=mock_client)
         )
 
         # Verify nested structures are preserved
@@ -707,8 +711,9 @@ def function_{i}():
     def test_confluence_edge_cases(self, confluence_preprocessor):
         """Test edge cases in Confluence content processing."""
         # Empty content
+        mock_client = MockConfluenceClient()
         processed_html, processed_markdown = (
-            confluence_preprocessor.process_html_content("")
+            confluence_preprocessor.process_html_content("", confluence_client=mock_client)
         )
         assert processed_html == ""
         assert processed_markdown == ""
@@ -716,7 +721,7 @@ def function_{i}():
         # Malformed HTML
         malformed_html = "<p>Unclosed paragraph <strong>bold text</p>"
         processed_html, processed_markdown = (
-            confluence_preprocessor.process_html_content(malformed_html)
+            confluence_preprocessor.process_html_content(malformed_html, confluence_client=mock_client)
         )
         assert "Unclosed paragraph" in processed_markdown
         assert "bold text" in processed_markdown
@@ -726,14 +731,14 @@ def function_{i}():
             <![CDATA[This is raw CDATA content with <tags>]]>
         </div>"""
         processed_html, processed_markdown = (
-            confluence_preprocessor.process_html_content(cdata_html)
+            confluence_preprocessor.process_html_content(cdata_html, confluence_client=mock_client)
         )
         assert "This is raw CDATA content" in processed_markdown
 
         # Very long single line
         long_line_html = f"<p>{'x' * 10000}</p>"
         processed_html, processed_markdown = (
-            confluence_preprocessor.process_html_content(long_line_html)
+            confluence_preprocessor.process_html_content(long_line_html, confluence_client=mock_client)
         )
         assert len(processed_markdown) >= 10000
 
@@ -744,8 +749,9 @@ def function_{i}():
 <p>Numeric entities: &#65; &#66; &#67; &#8364; &#128512;</p>
 <p>Mixed: &lt;tag&gt; &amp;&amp; &quot;quoted&quot;</p>"""
 
+        mock_client = MockConfluenceClient()
         processed_html, processed_markdown = (
-            confluence_preprocessor.process_html_content(html_with_entities)
+            confluence_preprocessor.process_html_content(html_with_entities, confluence_client=mock_client)
         )
 
         # Verify entities are properly decoded
@@ -825,8 +831,9 @@ Emojis: 😀 😎 🚀 💻 ✅ ❌ ⚡ 🔥"""
         jira_result = jira_preprocessor.clean_jira_text(unicode_content)
 
         # Process through Confluence
+        mock_client = MockConfluenceClient()
         processed_html, confluence_result = (
-            confluence_preprocessor.process_html_content(f"<p>{unicode_content}</p>")
+            confluence_preprocessor.process_html_content(f"<p>{unicode_content}</p>", confluence_client=mock_client)
         )
 
         # Verify Unicode is preserved in both
@@ -851,7 +858,8 @@ Emojis: 😀 😎 🚀 💻 ✅ ❌ ⚡ 🔥"""
         assert len(jira_result) > 0
 
         # Confluence should handle this
+        mock_client = MockConfluenceClient()
         processed_html, confluence_result = (
-            confluence_preprocessor.process_html_content(malformed_content)
+            confluence_preprocessor.process_html_content(malformed_content, confluence_client=mock_client)
         )
         assert len(confluence_result) > 0

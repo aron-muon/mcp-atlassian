@@ -106,8 +106,40 @@ class JiraConfig:
             is_cloud = False
 
         if oauth_config:
-            # OAuth is available - could be full config or minimal config for user-provided tokens
-            auth_type = "oauth"
+            # Check if OAuth configuration is complete for traditional OAuth mode
+            if isinstance(oauth_config, OAuthConfig):
+                # Traditional OAuth requires all fields
+                if (
+                    oauth_config.client_id
+                    and oauth_config.client_secret
+                    and oauth_config.redirect_uri
+                    and oauth_config.scope
+                    and oauth_config.cloud_id
+                ):
+                    auth_type = "oauth"
+                else:
+                    # Incomplete OAuth config - try fallback to other auth methods
+                    if username and api_token:
+                        auth_type = "basic"
+                    elif personal_token:
+                        auth_type = "pat"
+                    else:
+                        # No valid fallback, raise error
+                        error_msg = "Incomplete OAuth configuration and no valid fallback authentication available"
+                        raise ValueError(error_msg)
+            else:
+                # BYOAccessTokenOAuthConfig is valid if cloud_id and access_token are present
+                if oauth_config.cloud_id and oauth_config.access_token:
+                    auth_type = "oauth"
+                else:
+                    # Incomplete BYO token config - try fallback
+                    if username and api_token:
+                        auth_type = "basic"
+                    elif personal_token:
+                        auth_type = "pat"
+                    else:
+                        error_msg = "Incomplete BYO OAuth configuration and no valid fallback authentication available"
+                        raise ValueError(error_msg)
         elif is_cloud:
             if username and api_token:
                 auth_type = "basic"

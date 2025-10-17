@@ -1,6 +1,7 @@
 """Main FastMCP server setup for Atlassian integration."""
 
 import logging
+import os
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Any, Literal, Optional

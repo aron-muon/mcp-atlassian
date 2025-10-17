@@ -50,6 +50,7 @@ def test_from_env_rewrite():
                 "ATLASSIAN_OAUTH_CLIENT_SECRET": "test_client_secret",
                 "ATLASSIAN_OAUTH_REDIRECT_URI": "test_redirect_uri",
                 "ATLASSIAN_OAUTH_SCOPE": "test_scope",
+                "ATLASSIAN_OAUTH_CLOUD_ID": "test_cloud_id",  # Add missing cloud_id to make OAuth complete
             }
         )
         assert config.url == "https://test2.atlassian.net"
@@ -240,7 +241,7 @@ def test_is_cloud_oauth_with_cloud_id():
 
 
 def test_from_env_oauth_enable_no_url():
-    """Test BYOT OAuth mode - ATLASSIAN_OAUTH_ENABLE=true without URL or cloud_id."""
+    """Test BYOT OAuth mode - ATLASSIAN_OAUTH_ENABLE=true without URL or cloud_id should fail."""
     with patch.dict(
         os.environ,
         {
@@ -250,9 +251,8 @@ def test_from_env_oauth_enable_no_url():
         },
         clear=True,
     ):
-        config = JiraConfig.from_env()
-        assert config.auth_type == "oauth"
-        assert config.is_cloud is False
+        with pytest.raises(ValueError, match="Incomplete OAuth configuration and no valid fallback authentication available"):
+            JiraConfig.from_env()
 
 
 def test_from_env_oauth_enable_no_url_with_cloud_id():
@@ -262,6 +262,7 @@ def test_from_env_oauth_enable_no_url_with_cloud_id():
         {
             "ATLASSIAN_OAUTH_ENABLE": "true",
             "ATLASSIAN_OAUTH_CLOUD_ID": "test-cloud-id",
+            "ATLASSIAN_OAUTH_ACCESS_TOKEN": "test-access-token",  # Add access token to make BYOT complete
             # No JIRA_URL set
         },
         clear=True,
@@ -278,6 +279,8 @@ def test_from_env_oauth_enable_with_cloud_url():
         {
             "ATLASSIAN_OAUTH_ENABLE": "true",
             "JIRA_URL": "https://test.atlassian.net",
+            "ATLASSIAN_OAUTH_CLOUD_ID": "test-cloud-id",  # Add cloud_id to make OAuth complete
+            "ATLASSIAN_OAUTH_ACCESS_TOKEN": "test-access-token",  # Add access token for BYOT
         },
         clear=True,
     ):
@@ -288,18 +291,21 @@ def test_from_env_oauth_enable_with_cloud_url():
 
 
 def test_from_env_oauth_enable_with_server_url():
-    """Test BYOT OAuth mode - ATLASSIAN_OAUTH_ENABLE=true with Server URL."""
+    """Test BYOT OAuth mode - ATLASSIAN_OAUTH_ENABLE=true with Server URL should fallback to basic auth."""
     with patch.dict(
         os.environ,
         {
             "ATLASSIAN_OAUTH_ENABLE": "true",
             "JIRA_URL": "https://jira.example.com",
+            "JIRA_USERNAME": "test_user",  # Add fallback auth
+            "JIRA_API_TOKEN": "test_token",  # Add fallback auth
         },
         clear=True,
     ):
+        # Should fallback to basic auth since OAuth is incomplete and this is a server URL
         config = JiraConfig.from_env()
         assert config.url == "https://jira.example.com"
-        assert config.auth_type == "oauth"
+        assert config.auth_type == "basic"
         assert config.is_cloud is False
 
 
