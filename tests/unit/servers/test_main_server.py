@@ -82,37 +82,63 @@ async def test_run_server_invalid_transport():
 
 @pytest.mark.anyio
 async def test_health_check_endpoint():
-    """Test the health check endpoint returns 200 and correct JSON response."""
+    """Test the health check endpoint returns appropriate response with health metrics."""
     app = main_mcp.sse_app()
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/healthz")
 
-        assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
+        # Should return either 200 (healthy) or 503 (unhealthy) but always return structured data
+        assert response.status_code in [200, 503]
+
+        health_data = response.json()
+
+        # Check for required health check structure
+        assert "overall_status" in health_data
+        assert "timestamp" in health_data
+        assert "error_metrics" in health_data
+        assert health_data["overall_status"] in ["healthy", "unhealthy", "degraded", "critical"]
 
 
 @pytest.mark.anyio
 async def test_sse_app_health_check_endpoint():
-    """Test the /healthz endpoint on the SSE app returns 200 and correct JSON response."""
+    """Test the /healthz endpoint on the SSE app returns appropriate response with health metrics."""
     app = main_mcp.sse_app()
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/healthz")
-        assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
+
+        # Should return either 200 (healthy) or 503 (unhealthy) but always return structured data
+        assert response.status_code in [200, 503]
+
+        health_data = response.json()
+
+        # Check for required health check structure
+        assert "overall_status" in health_data
+        assert "timestamp" in health_data
+        assert "error_metrics" in health_data
+        assert health_data["overall_status"] in ["healthy", "unhealthy", "degraded", "critical"]
 
 
 @pytest.mark.anyio
 @patch.dict("os.environ", {"IGNORE_HEADER_AUTH": "false"}, clear=False)
 async def test_streamable_http_app_health_check_endpoint():
-    """Test the /healthz endpoint on the Streamable HTTP app returns 200 and correct JSON response."""
+    """Test the /healthz endpoint on the Streamable HTTP app returns appropriate response with health metrics."""
     app = main_mcp.streamable_http_app()
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.get("/healthz")
-        assert response.status_code == 200
-        assert response.json() == {"status": "ok"}
+
+        # Should return either 200 (healthy) or 503 (unhealthy) but always return structured data
+        assert response.status_code in [200, 503]
+
+        health_data = response.json()
+
+        # Check for required health check structure
+        assert "overall_status" in health_data
+        assert "timestamp" in health_data
+        assert "error_metrics" in health_data
+        assert health_data["overall_status"] in ["healthy", "unhealthy", "degraded", "critical"]
 
 
 class TestUserTokenMiddleware:

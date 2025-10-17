@@ -19,7 +19,7 @@ def test_setup_logging_default_level():
     assert len(root_logger.handlers) == 1
     handler = root_logger.handlers[0]
     assert isinstance(handler, logging.Handler)
-    assert handler.formatter._fmt == "%(levelname)s - %(name)s - %(message)s"
+    assert handler.formatter._fmt == "%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 
 
 def test_setup_logging_custom_level():
@@ -61,4 +61,7 @@ def test_setup_logging_logging_stream():
     stream = io.StringIO()
     logger = setup_logging(logging.DEBUG, stream)
     logger.debug("test")
-    assert stream.getvalue() == f"DEBUG - {logger.name} - test\n"
+    # The format now includes timestamp: "YYYY-MM-DD HH:MM:SS,mmm - LEVEL - name - message"
+    output = stream.getvalue()
+    assert f"DEBUG - {logger.name} - test" in output
+    assert output.endswith("\n")

@@ -1,5 +1,6 @@
 import json
 import logging
+import uuid
 from collections.abc import Awaitable, Callable
 from functools import wraps
 from typing import Any, TypeVar
@@ -14,6 +15,37 @@ logger = logging.getLogger(__name__)
 
 
 F = TypeVar("F", bound=Callable[..., Awaitable[Any]])
+
+
+def is_rate_limit_error(error: HTTPError) -> bool:
+    """Detect if an error is due to rate limiting.
+
+    Args:
+        error: HTTPError to check
+
+    Returns:
+        True if the error indicates rate limiting
+    """
+    if not hasattr(error, 'response') or not error.response:
+        return False
+
+    status_code = getattr(error.response, 'status_code', None)
+    headers = getattr(error.response, 'headers', {})
+
+    # Check for 429 status code
+    if status_code == 429:
+        return True
+
+    # Check for Retry-After header
+    if headers.get('Retry-After'):
+        return True
+
+    # Check for rate limit remaining at zero
+    rate_limit_remaining = headers.get('X-RateLimit-Remaining') or headers.get('x-ratelimit-remaining')
+    if rate_limit_remaining == '0' or rate_limit_remaining == 0:
+        return True
+
+    return False
 
 
 def check_write_access(service_name_or_func: str | F = "Service") -> Callable:
@@ -82,6 +114,10 @@ def handle_atlassian_api_errors(service_name: str = "Atlassian API") -> Callable
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+            # Generate correlation ID for this API call
+            correlation_id = str(uuid.uuid4())[:8]
+            operation_name = getattr(func, "__name__", "API operation")
+
             try:
                 return func(self, *args, **kwargs)
             except HTTPError as http_err:
@@ -94,32 +130,51 @@ def handle_atlassian_api_errors(service_name: str = "Atlassian API") -> Callable
                         f"({http_err.response.status_code}). "
                         "Token may be expired or invalid. Please verify credentials."
                     )
-                    logger.error(error_msg)
+                    logger.error(
+                        f"[{correlation_id}] Authentication error in {operation_name}: {error_msg}",
+                        extra={"correlation_id": correlation_id, "operation": operation_name, "service": service_name}
+                    )
                     raise MCPAtlassianAuthenticationError(error_msg) from http_err
                 else:
-                    operation_name = getattr(func, "__name__", "API operation")
+                    status_code = getattr(http_err.response, 'status_code', 'Unknown') if http_err.response else 'Unknown'
                     logger.error(
-                        f"HTTP error during {operation_name}: {http_err}",
+                        f"[{correlation_id}] HTTP {status_code} error during {operation_name}: {http_err}",
+                        extra={
+                            "correlation_id": correlation_id,
+                            "operation": operation_name,
+                            "service": service_name,
+                            "status_code": status_code
+                        },
                         exc_info=False,
                     )
                     raise http_err
             except KeyError as e:
-                operation_name = getattr(func, "__name__", "API operation")
-                logger.error(f"Missing key in {operation_name} results: {str(e)}")
+                logger.error(
+                    f"[{correlation_id}] Missing key in {operation_name} results: {str(e)}",
+                    extra={"correlation_id": correlation_id, "operation": operation_name, "service": service_name}
+                )
                 return []
             except requests.RequestException as e:
-                operation_name = getattr(func, "__name__", "API operation")
-                logger.error(f"Network error during {operation_name}: {str(e)}")
+                logger.error(
+                    f"[{correlation_id}] Network error during {operation_name}: {str(e)}",
+                    extra={"correlation_id": correlation_id, "operation": operation_name, "service": service_name}
+                )
                 return []
             except (ValueError, TypeError) as e:
-                operation_name = getattr(func, "__name__", "API operation")
-                logger.error(f"Error processing {operation_name} results: {str(e)}")
+                logger.error(
+                    f"[{correlation_id}] Error processing {operation_name} results: {str(e)}",
+                    extra={"correlation_id": correlation_id, "operation": operation_name, "service": service_name}
+                )
                 return []
             except Exception as e:  # noqa: BLE001 - Intentional fallback with logging
-                operation_name = getattr(func, "__name__", "API operation")
-                logger.error(f"Unexpected error during {operation_name}: {str(e)}")
+                logger.error(
+                    f"[{correlation_id}] Unexpected error during {operation_name}: {str(e)}",
+                    extra={"correlation_id": correlation_id, "operation": operation_name, "service": service_name}
+                )
                 logger.debug(
-                    f"Full exception details for {operation_name}:", exc_info=True
+                    f"[{correlation_id}] Full exception details for {operation_name}:",
+                    extra={"correlation_id": correlation_id},
+                    exc_info=True
                 )
                 return []
 
@@ -152,55 +207,133 @@ def handle_tool_errors(
     def decorator(func: F) -> F:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> str:
+            # Generate correlation ID for this request
+            correlation_id = str(uuid.uuid4())[:8]
+
+            # Extract context if available (first arg is usually ctx for MCP tools)
+            ctx = None
+            if args and hasattr(args[0], 'request_context'):
+                ctx = args[0]
+                # Store correlation ID in context for logging
+                if hasattr(ctx, 'request_context'):
+                    ctx.request_context.correlation_id = correlation_id
+
             try:
                 return await func(*args, **kwargs)
             except MCPAtlassianAuthenticationError as auth_err:
-                logger.error(f"Authentication error in {func.__name__}: {auth_err}")
-                return json.dumps(
-                    {
-                        "error": "Authentication Failed",
-                        "message": str(auth_err),
-                        default_return_key: {},
-                    },
-                    indent=2,
-                    ensure_ascii=False,
+                error_details = {
+                    "success": False,
+                    "error": "Authentication Failed",
+                    "error_type": "authentication",
+                    "message": str(auth_err),
+                    "correlation_id": correlation_id,
+                    "service": service_name,
+                    "tool": func.__name__,
+                    default_return_key: {},
+                }
+                logger.error(
+                    f"[{correlation_id}] Authentication error in {func.__name__}: {auth_err}",
+                    extra={"correlation_id": correlation_id, "tool": func.__name__, "service": service_name}
                 )
+                return json.dumps(error_details, indent=2, ensure_ascii=False)
+
             except HTTPError as http_err:
-                logger.error(f"HTTP error in {func.__name__}: {http_err}")
-                status_code = (
-                    http_err.response.status_code if http_err.response else "Unknown"
+                status_code = http_err.response.status_code if http_err.response else "Unknown"
+                # Detect rate limiting
+                is_rate_limit = status_code == 429 or (
+                    hasattr(http_err.response, 'headers') and
+                    http_err.response.headers.get('X-RateLimit-Remaining') == '0'
                 )
-                return json.dumps(
-                    {
-                        "error": f"HTTP {status_code}",
-                        "message": f"{service_name} API error: {str(http_err)}",
-                        default_return_key: {},
-                    },
-                    indent=2,
-                    ensure_ascii=False,
+
+                error_type = "rate_limit" if is_rate_limit else "http_error"
+                error_code = f"HTTP_{status_code}"
+
+                # Handle specific HTTP errors with better messages
+                if status_code == 401:
+                    message = f"Authentication failed for {service_name}. Please check your credentials."
+                elif status_code == 403:
+                    message = f"Access denied for {service_name}. You may not have permission to perform this operation."
+                elif status_code == 404:
+                    message = f"Resource not found in {service_name}."
+                elif status_code == 429:
+                    retry_after = None
+                    if hasattr(http_err.response, 'headers'):
+                        retry_after = http_err.response.headers.get('Retry-After')
+                    message = f"Rate limit exceeded for {service_name}. Please try again later{f' after {retry_after} seconds' if retry_after else ''}."
+                elif status_code >= 500:
+                    message = f"{service_name} server error. Please try again later."
+                else:
+                    message = f"{service_name} API error: {str(http_err)}"
+
+                error_details = {
+                    "success": False,
+                    "error": error_code,
+                    "error_type": error_type,
+                    "message": message,
+                    "correlation_id": correlation_id,
+                    "service": service_name,
+                    "tool": func.__name__,
+                    "status_code": status_code,
+                    default_return_key: {},
+                }
+
+                # Add retry information for rate limiting
+                if is_rate_limit and hasattr(http_err.response, 'headers'):
+                    error_details["retry_after"] = http_err.response.headers.get('Retry-After')
+                    error_details["rate_limit_remaining"] = http_err.response.headers.get('X-RateLimit-Remaining')
+                    error_details["rate_limit_reset"] = http_err.response.headers.get('X-RateLimit-Reset')
+
+                logger.error(
+                    f"[{correlation_id}] HTTP {status_code} error in {func.__name__}: {message}",
+                    extra={
+                        "correlation_id": correlation_id,
+                        "tool": func.__name__,
+                        "service": service_name,
+                        "status_code": status_code,
+                        "error_type": error_type
+                    }
                 )
+                return json.dumps(error_details, indent=2, ensure_ascii=False)
+
             except ValueError as val_err:
-                logger.error(f"Validation error in {func.__name__}: {val_err}")
-                return json.dumps(
-                    {
-                        "error": "Validation Error",
-                        "message": str(val_err),
-                        default_return_key: {},
-                    },
-                    indent=2,
-                    ensure_ascii=False,
+                error_details = {
+                    "success": False,
+                    "error": "Validation Error",
+                    "error_type": "validation",
+                    "message": str(val_err),
+                    "correlation_id": correlation_id,
+                    "service": service_name,
+                    "tool": func.__name__,
+                    default_return_key: {},
+                }
+                logger.error(
+                    f"[{correlation_id}] Validation error in {func.__name__}: {val_err}",
+                    extra={"correlation_id": correlation_id, "tool": func.__name__, "service": service_name}
                 )
+                return json.dumps(error_details, indent=2, ensure_ascii=False)
+
             except Exception as e:
-                logger.error(f"Unexpected error in {func.__name__}: {e}", exc_info=True)
-                return json.dumps(
-                    {
-                        "error": "Internal Error",
-                        "message": f"Error in {service_name}: {str(e)}",
-                        default_return_key: {},
+                error_details = {
+                    "success": False,
+                    "error": "Internal Error",
+                    "error_type": "internal",
+                    "message": f"An unexpected error occurred in {service_name}: {str(e)}",
+                    "correlation_id": correlation_id,
+                    "service": service_name,
+                    "tool": func.__name__,
+                    default_return_key: {},
+                }
+                logger.error(
+                    f"[{correlation_id}] Unexpected error in {func.__name__}: {e}",
+                    extra={
+                        "correlation_id": correlation_id,
+                        "tool": func.__name__,
+                        "service": service_name,
+                        "error_type": "internal"
                     },
-                    indent=2,
-                    ensure_ascii=False,
+                    exc_info=True
                 )
+                return json.dumps(error_details, indent=2, ensure_ascii=False)
 
         return wrapper  # type: ignore
 

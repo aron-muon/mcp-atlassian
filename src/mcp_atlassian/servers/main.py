@@ -2,6 +2,7 @@
 
 import logging
 import os
+import uuid
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Any, Literal, Optional
@@ -22,7 +23,14 @@ from mcp_atlassian.jira import JiraFetcher
 from mcp_atlassian.jira.config import JiraConfig
 from mcp_atlassian.utils.environment import get_available_services
 from mcp_atlassian.utils.io import is_read_only_mode
-from mcp_atlassian.utils.logging import mask_sensitive
+from mcp_atlassian.utils.logging import mask_sensitive, setup_structured_logging
+from mcp_atlassian.utils.metrics import (
+    health_check_endpoint,
+    metrics_endpoint,
+    record_error,
+    setup_health_checks,
+    track_errors,
+)
 from mcp_atlassian.utils.tools import get_enabled_tools, should_include_tool
 
 from .confluence import register_confluence_tools
@@ -106,6 +114,13 @@ def build_main_lifespan(
         logger.info(
             f"Enabled tools filter: {loaded_enabled_tools or 'All tools enabled'}"
         )
+
+        # Set up health checks
+        try:
+            setup_health_checks(loaded_jira_config, loaded_confluence_config)
+            logger.info("Health checks configured successfully")
+        except Exception as e:
+            logger.warning(f"Failed to setup some health checks: {e}")
 
         try:
             yield {"app_lifespan_context": app_context}
@@ -260,7 +275,7 @@ token_validation_cache: TTLCache[
 
 
 class UserTokenMiddleware(BaseHTTPMiddleware):
-    """Middleware to extract Atlassian user tokens/credentials from Authorization headers."""
+    """Middleware to extract Atlassian user tokens/credentials from Authorization headers and add correlation tracking."""
 
     def __init__(
         self, app: Any, mcp_server_ref: Optional["AtlassianMCP"] = None
@@ -275,20 +290,24 @@ class UserTokenMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
+        # Generate correlation ID for this request
+        correlation_id = str(uuid.uuid4())[:8]
+        request.state.correlation_id = correlation_id
+
         logger.debug(
-            f"UserTokenMiddleware.dispatch: ENTERED for request path='{request.url.path}', method='{request.method}'"
+            f"[{correlation_id}] UserTokenMiddleware.dispatch: ENTERED for request path='{request.url.path}', method='{request.method}'"
         )
         mcp_server_instance = self.mcp_server_ref
         if mcp_server_instance is None:
             logger.debug(
-                "UserTokenMiddleware.dispatch: self.mcp_server_ref is None. Skipping MCP auth logic."
+                f"[{correlation_id}] UserTokenMiddleware.dispatch: self.mcp_server_ref is None. Skipping MCP auth logic."
             )
             return await call_next(request)
 
         mcp_path = mcp_server_instance.settings.streamable_http_path.rstrip("/")
         request_path = request.url.path.rstrip("/")
         logger.debug(
-            f"UserTokenMiddleware.dispatch: Comparing request_path='{request_path}' with mcp_path='{mcp_path}'. Request method='{request.method}'"
+            f"[{correlation_id}] UserTokenMiddleware.dispatch: Comparing request_path='{request_path}' with mcp_path='{mcp_path}'. Request method='{request.method}'"
         )
         if request_path == mcp_path and request.method == "POST":
             # Check if we should ignore header-based auth (NEW)
@@ -302,7 +321,7 @@ class UserTokenMiddleware(BaseHTTPMiddleware):
             # NEW: If IGNORE_HEADER_AUTH is set, ignore the Authorization header
             if ignore_header_auth and auth_header:
                 logger.debug(
-                    "UserTokenMiddleware.dispatch: IGNORE_HEADER_AUTH is enabled, "
+                    f"[{correlation_id}] UserTokenMiddleware.dispatch: IGNORE_HEADER_AUTH is enabled, "
                     "ignoring incoming Authorization header and using environment config"
                 )
                 auth_header = None
@@ -321,19 +340,19 @@ class UserTokenMiddleware(BaseHTTPMiddleware):
                 else auth_header
             )
             logger.debug(
-                f"UserTokenMiddleware: Path='{request.url.path}', AuthHeader='{mask_sensitive(auth_header)}', ParsedToken(masked)='{token_for_log}', CloudId='{cloud_id_header}'"
+                f"[{correlation_id}] UserTokenMiddleware: Path='{request.url.path}', AuthHeader='{mask_sensitive(auth_header)}', ParsedToken(masked)='{token_for_log}', CloudId='{cloud_id_header}'"
             )
 
             # Extract and save cloudId if provided
             if cloud_id_header and cloud_id_header.strip():
                 request.state.user_atlassian_cloud_id = cloud_id_header.strip()
                 logger.debug(
-                    f"UserTokenMiddleware: Extracted cloudId from header: {cloud_id_header.strip()}"
+                    f"[{correlation_id}] UserTokenMiddleware: Extracted cloudId from header: {cloud_id_header.strip()}"
                 )
             else:
                 request.state.user_atlassian_cloud_id = None
                 logger.debug(
-                    "UserTokenMiddleware: No cloudId header provided, will use global config"
+                    f"[{correlation_id}] UserTokenMiddleware: No cloudId header provided, will use global config"
                 )
             service_headers = {}
             if jira_token_header:
@@ -350,42 +369,50 @@ class UserTokenMiddleware(BaseHTTPMiddleware):
             request.state.atlassian_service_headers = service_headers
             if service_headers:
                 logger.debug(
-                    f"UserTokenMiddleware: Extracted service headers: {list(service_headers.keys())}"
+                    f"[{correlation_id}] UserTokenMiddleware: Extracted service headers: {list(service_headers.keys())}"
                 )
 
             # Check for mcp-session-id header for debugging
             mcp_session_id = request.headers.get("mcp-session-id")
             if mcp_session_id:
                 logger.debug(
-                    f"UserTokenMiddleware: MCP-Session-ID header found: {mcp_session_id}"
+                    f"[{correlation_id}] UserTokenMiddleware: MCP-Session-ID header found: {mcp_session_id}"
                 )
             if auth_header and auth_header.startswith("Bearer "):
                 token = auth_header.split(" ", 1)[1].strip()
                 if not token:
-                    return JSONResponse(
-                        {"error": "Unauthorized: Empty Bearer token"},
-                        status_code=401,
-                    )
+                    error_response = {
+                        "success": False,
+                        "error": "Unauthorized",
+                        "error_type": "authentication",
+                        "message": "Empty Bearer token",
+                        "correlation_id": correlation_id,
+                    }
+                    return JSONResponse(error_response, status_code=401)
                 logger.debug(
-                    f"UserTokenMiddleware.dispatch: Bearer token extracted (masked): ...{mask_sensitive(token, 8)}"
+                    f"[{correlation_id}] UserTokenMiddleware.dispatch: Bearer token extracted (masked): ...{mask_sensitive(token, 8)}"
                 )
                 request.state.user_atlassian_token = token
                 request.state.user_atlassian_auth_type = "oauth"
                 request.state.user_atlassian_email = None
                 logger.debug(
-                    f"UserTokenMiddleware.dispatch: Set request.state (pre-validation): "
+                    f"[{correlation_id}] UserTokenMiddleware.dispatch: Set request.state (pre-validation): "
                     f"auth_type='{getattr(request.state, 'user_atlassian_auth_type', 'N/A')}', "
                     f"token_present={bool(getattr(request.state, 'user_atlassian_token', None))}"
                 )
             elif auth_header and auth_header.startswith("Token "):
                 token = auth_header.split(" ", 1)[1].strip()
                 if not token:
-                    return JSONResponse(
-                        {"error": "Unauthorized: Empty Token (PAT)"},
-                        status_code=401,
-                    )
+                    error_response = {
+                        "success": False,
+                        "error": "Unauthorized",
+                        "error_type": "authentication",
+                        "message": "Empty Token (PAT)",
+                        "correlation_id": correlation_id,
+                    }
+                    return JSONResponse(error_response, status_code=401)
                 logger.debug(
-                    f"UserTokenMiddleware.dispatch: PAT (Token scheme) extracted (masked): ...{mask_sensitive(token, 8)}"
+                    f"[{correlation_id}] UserTokenMiddleware.dispatch: PAT (Token scheme) extracted (masked): ...{mask_sensitive(token, 8)}"
                 )
                 request.state.user_atlassian_token = token
                 request.state.user_atlassian_auth_type = "pat"
@@ -393,40 +420,42 @@ class UserTokenMiddleware(BaseHTTPMiddleware):
                     None  # PATs don't carry email in the token itself
                 )
                 logger.debug(
-                    "UserTokenMiddleware.dispatch: Set request.state for PAT auth."
+                    f"[{correlation_id}] UserTokenMiddleware.dispatch: Set request.state for PAT auth."
                 )
             elif auth_header:
                 logger.warning(
-                    f"Unsupported Authorization type for {request.url.path}: {auth_header.split(' ', 1)[0] if ' ' in auth_header else 'UnknownType'}"
+                    f"[{correlation_id}] Unsupported Authorization type for {request.url.path}: {auth_header.split(' ', 1)[0] if ' ' in auth_header else 'UnknownType'}"
                 )
-                return JSONResponse(
-                    {
-                        "error": "Unauthorized: Only 'Bearer <OAuthToken>' or 'Token <PAT>' types are supported."
-                    },
-                    status_code=401,
-                )
+                error_response = {
+                    "success": False,
+                    "error": "Unauthorized",
+                    "error_type": "authentication",
+                    "message": "Only 'Bearer <OAuthToken>' or 'Token <PAT>' types are supported.",
+                    "correlation_id": correlation_id,
+                }
+                return JSONResponse(error_response, status_code=401)
             else:
                 if (jira_token_header and jira_url_header) or (
                     confluence_token_header and confluence_url_header
                 ):
                     logger.debug(
-                        f"Header-based authentication detected for {request.url.path}. Setting PAT auth type."
+                        f"[{correlation_id}] Header-based authentication detected for {request.url.path}. Setting PAT auth type."
                     )
                     request.state.user_atlassian_auth_type = "pat"
                     request.state.user_atlassian_email = None
                 else:
                     if ignore_header_auth:
                         logger.debug(
-                            f"No Authorization header processing for {request.url.path} (IGNORE_HEADER_AUTH=true). "
+                            f"[{correlation_id}] No Authorization header processing for {request.url.path} (IGNORE_HEADER_AUTH=true). "
                             "Will use global/fallback server configuration."
                         )
                     else:
                         logger.debug(
-                            f"No Authorization header provided for {request.url.path}. Will proceed with global/fallback server configuration if applicable."
+                            f"[{correlation_id}] No Authorization header provided for {request.url.path}. Will proceed with global/fallback server configuration if applicable."
                         )
         response = await call_next(request)
         logger.debug(
-            f"UserTokenMiddleware.dispatch: EXITED for request path='{request.url.path}'"
+            f"[{correlation_id}] UserTokenMiddleware.dispatch: EXITED for request path='{request.url.path}'"
         )
         return response
 
@@ -463,9 +492,14 @@ def build_main_mcp(
 
     @atlassian_mcp.custom_route("/healthz", methods=["GET"], include_in_schema=False)
     async def _health_check_route(request: Request) -> JSONResponse:
-        return await health_check(request)
+        return await health_check_endpoint()
+
+    @atlassian_mcp.custom_route("/metrics", methods=["GET"], include_in_schema=False)
+    async def _metrics_route(request: Request) -> JSONResponse:
+        return await metrics_endpoint()
 
     logger.info("Added /healthz endpoint for Kubernetes probes")
+    logger.info("Added /metrics endpoint for monitoring")
     return atlassian_mcp
 
 

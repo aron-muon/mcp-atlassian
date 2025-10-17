@@ -11,6 +11,7 @@ from mcp_atlassian.exceptions import MCPAtlassianAuthenticationError
 from mcp_atlassian.servers.dependencies import get_confluence_fetcher
 from mcp_atlassian.utils.decorators import (
     check_write_access,
+    handle_tool_errors,
 )
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 def register_confluence_tools(confluence_mcp: FastMCP) -> None:
     @confluence_mcp.tool(tags={"confluence", "read"})
+    @handle_tool_errors(default_return_key="results", service_name="Confluence")
     async def search(
         ctx: Context,
         query: Annotated[
@@ -108,6 +110,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
         return json.dumps(search_results, indent=2, ensure_ascii=False)
 
     @confluence_mcp.tool(tags={"confluence", "read"})
+    @handle_tool_errors(default_return_key="page", service_name="Confluence")
     async def get_page(
         ctx: Context,
         page_id: Annotated[
@@ -223,6 +226,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
         return json.dumps(result, indent=2, ensure_ascii=False)
 
     @confluence_mcp.tool(tags={"confluence", "read"})
+    @handle_tool_errors(default_return_key="results", service_name="Confluence")
     async def get_page_children(
         ctx: Context,
         parent_id: Annotated[
@@ -312,6 +316,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
         return json.dumps(result, indent=2, ensure_ascii=False)
 
     @confluence_mcp.tool(tags={"confluence", "read"})
+    @handle_tool_errors(default_return_key="comments", service_name="Confluence")
     async def get_comments(
         ctx: Context,
         page_id: Annotated[
@@ -340,6 +345,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
         return json.dumps(formatted_comments, indent=2, ensure_ascii=False)
 
     @confluence_mcp.tool(tags={"confluence", "read"})
+    @handle_tool_errors(default_return_key="labels", service_name="Confluence")
     async def get_labels(
         ctx: Context,
         page_id: Annotated[
@@ -369,6 +375,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
 
     @confluence_mcp.tool(tags={"confluence", "write"})
     @check_write_access("confluence")
+    @handle_tool_errors(default_return_key="labels", service_name="Confluence")
     async def add_label(
         ctx: Context,
         page_id: Annotated[str, Field(description="The ID of the page to update")],
@@ -394,6 +401,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
 
     @confluence_mcp.tool(tags={"confluence", "write"})
     @check_write_access("confluence")
+    @handle_tool_errors(default_return_key="page", service_name="Confluence")
     async def create_page(
         ctx: Context,
         space_key: Annotated[
@@ -485,6 +493,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
 
     @confluence_mcp.tool(tags={"confluence", "write"})
     @check_write_access("confluence")
+    @handle_tool_errors(default_return_key="page", service_name="Confluence")
     async def update_page(
         ctx: Context,
         page_id: Annotated[str, Field(description="The ID of the page to update")],
@@ -579,6 +588,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
 
     @confluence_mcp.tool(tags={"confluence", "write"})
     @check_write_access("confluence")
+    @handle_tool_errors(default_return_key="result", service_name="Confluence")
     async def delete_page(
         ctx: Context,
         page_id: Annotated[str, Field(description="The ID of the page to delete")],
@@ -620,6 +630,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
 
     @confluence_mcp.tool(tags={"confluence", "write"})
     @check_write_access("confluence")
+    @handle_tool_errors(default_return_key="comment", service_name="Confluence")
     async def add_comment(
         ctx: Context,
         page_id: Annotated[
@@ -668,6 +679,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
         return json.dumps(response, indent=2, ensure_ascii=False)
 
     @confluence_mcp.tool(tags={"confluence", "read"})
+    @handle_tool_errors(default_return_key="results", service_name="Confluence")
     async def search_user(
         ctx: Context,
         query: Annotated[
@@ -739,6 +751,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
             )
 
     @confluence_mcp.tool(tags={"confluence", "read"})
+    @handle_tool_errors(default_return_key="user", service_name="Confluence")
     async def get_user_details(
         ctx: Context,
         identifier: Annotated[
@@ -805,6 +818,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
             )
 
     @confluence_mcp.tool(tags={"confluence", "read"})
+    @handle_tool_errors(default_return_key="results", service_name="Confluence")
     async def list_page_versions(
         ctx: Context,
         page_id: Annotated[
@@ -886,6 +900,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
             )
 
     @confluence_mcp.tool(tags={"confluence", "read"})
+    @handle_tool_errors(default_return_key="version", service_name="Confluence")
     async def get_page_version(
         ctx: Context,
         page_id: Annotated[
@@ -978,6 +993,7 @@ def register_confluence_tools(confluence_mcp: FastMCP) -> None:
 
     @confluence_mcp.tool(tags={"confluence", "write"})
     @check_write_access("confluence")
+    @handle_tool_errors(default_return_key="result", service_name="Confluence")
     async def move_page(
         ctx: Context,
         page_id: Annotated[
