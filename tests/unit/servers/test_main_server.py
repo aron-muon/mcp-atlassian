@@ -104,6 +104,7 @@ async def test_sse_app_health_check_endpoint():
 
 
 @pytest.mark.anyio
+@patch.dict("os.environ", {"IGNORE_HEADER_AUTH": "false"}, clear=False)
 async def test_streamable_http_app_health_check_endpoint():
     """Test the /healthz endpoint on the Streamable HTTP app returns 200 and correct JSON response."""
     app = main_mcp.streamable_http_app()
@@ -145,6 +146,34 @@ class TestUserTokenMiddleware:
         mock_response = JSONResponse({"test": "response"})
         call_next = AsyncMock(return_value=mock_response)
         return call_next
+
+    @pytest.mark.anyio
+    @patch.dict("os.environ", {"IGNORE_HEADER_AUTH": "true"}, clear=False)
+    async def test_ignore_header_auth_enabled(
+        self, middleware, mock_request, mock_call_next
+    ):
+        """Test that IGNORE_HEADER_AUTH=true ignores Authorization headers."""
+        # Setup request with both Authorization header and service headers
+        mock_request.headers = {
+            "Authorization": "Bearer should-be-ignored-token",
+            "X-Atlassian-Jira-Url": "https://test.atlassian.net",
+            "X-Atlassian-Jira-Personal-Token": "test-jira-pat-token",
+        }
+
+        result = await middleware.dispatch(mock_request, mock_call_next)
+
+        # Verify Authorization header was ignored (no OAuth state set)
+        assert not hasattr(mock_request.state, "user_atlassian_token")
+        # PAT auth type should still be set from service headers
+        assert hasattr(mock_request.state, "user_atlassian_auth_type")
+        assert mock_request.state.user_atlassian_auth_type == "pat"
+
+        # Service headers should still be processed
+        assert hasattr(mock_request.state, "atlassian_service_headers")
+        service_headers = mock_request.state.atlassian_service_headers
+        assert len(service_headers) == 2
+
+        mock_call_next.assert_called_once_with(mock_request)
 
     @pytest.mark.anyio
     async def test_cloud_id_header_extraction_success(

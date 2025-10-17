@@ -14,7 +14,7 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 from mcp_atlassian.confluence import ConfluenceFetcher
 from mcp_atlassian.confluence.config import ConfluenceConfig
@@ -274,7 +274,7 @@ class UserTokenMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
-    ) -> JSONResponse:
+    ) -> Response:
         logger.debug(
             f"UserTokenMiddleware.dispatch: ENTERED for request path='{request.url.path}', method='{request.method}'"
         )
@@ -291,8 +291,21 @@ class UserTokenMiddleware(BaseHTTPMiddleware):
             f"UserTokenMiddleware.dispatch: Comparing request_path='{request_path}' with mcp_path='{mcp_path}'. Request method='{request.method}'"
         )
         if request_path == mcp_path and request.method == "POST":
+            # Check if we should ignore header-based auth (NEW)
+            ignore_header_auth = (
+                os.getenv("IGNORE_HEADER_AUTH", "false").lower() == "true"
+            )
+
             auth_header = request.headers.get("Authorization")
             cloud_id_header = request.headers.get("X-Atlassian-Cloud-Id")
+
+            # NEW: If IGNORE_HEADER_AUTH is set, ignore the Authorization header
+            if ignore_header_auth and auth_header:
+                logger.debug(
+                    "UserTokenMiddleware.dispatch: IGNORE_HEADER_AUTH is enabled, "
+                    "ignoring incoming Authorization header and using environment config"
+                )
+                auth_header = None
 
             # Extract additional Atlassian headers for service availability detection
             jira_token_header = request.headers.get("X-Atlassian-Jira-Personal-Token")
@@ -402,9 +415,15 @@ class UserTokenMiddleware(BaseHTTPMiddleware):
                     request.state.user_atlassian_auth_type = "pat"
                     request.state.user_atlassian_email = None
                 else:
-                    logger.debug(
-                        f"No Authorization header provided for {request.url.path}. Will proceed with global/fallback server configuration if applicable."
-                    )
+                    if ignore_header_auth:
+                        logger.debug(
+                            f"No Authorization header processing for {request.url.path} (IGNORE_HEADER_AUTH=true). "
+                            "Will use global/fallback server configuration."
+                        )
+                    else:
+                        logger.debug(
+                            f"No Authorization header provided for {request.url.path}. Will proceed with global/fallback server configuration if applicable."
+                        )
         response = await call_next(request)
         logger.debug(
             f"UserTokenMiddleware.dispatch: EXITED for request path='{request.url.path}'"
