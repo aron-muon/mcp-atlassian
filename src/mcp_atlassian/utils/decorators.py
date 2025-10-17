@@ -10,6 +10,7 @@ from fastmcp import Context
 from requests.exceptions import HTTPError
 
 from mcp_atlassian.exceptions import MCPAtlassianAuthenticationError
+from mcp_atlassian.utils.retry import async_retry_with_backoff, RetryConfig
 
 logger = logging.getLogger(__name__)
 
@@ -36,14 +37,30 @@ def is_rate_limit_error(error: HTTPError) -> bool:
     if status_code == 429:
         return True
 
-    # Check for Retry-After header
-    if headers.get('Retry-After'):
+    # Check for Retry-After header (even empty string indicates rate limiting)
+    if 'Retry-After' in headers:
         return True
 
-    # Check for rate limit remaining at zero
-    rate_limit_remaining = headers.get('X-RateLimit-Remaining') or headers.get('x-ratelimit-remaining')
-    if rate_limit_remaining == '0' or rate_limit_remaining == 0:
-        return True
+    # Check for rate limit remaining at zero (handle various header names and value types)
+    rate_limit_headers = [
+        'X-RateLimit-Remaining',
+        'x-ratelimit-remaining',
+        'X-Rate-Limit-Remaining',
+        'Rate-Limit-Remaining',
+        'X-Rate-Remaining',
+        'RateLimit-Remaining',
+    ]
+
+    for header_name in rate_limit_headers:
+        rate_limit_remaining = headers.get(header_name)
+        if rate_limit_remaining is not None:
+            try:
+                # Convert to string for comparison, then to int for numeric check
+                if str(rate_limit_remaining) == '0' or int(rate_limit_remaining) == 0:
+                    return True
+            except (ValueError, TypeError):
+                # If we can't parse the value, continue with other checks
+                pass
 
     return False
 
@@ -207,20 +224,38 @@ def handle_tool_errors(
     def decorator(func: F) -> F:
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> str:
-            # Generate correlation ID for this request
-            correlation_id = str(uuid.uuid4())[:8]
-
             # Extract context if available (first arg is usually ctx for MCP tools)
             ctx = None
+            correlation_id = None
+
             if args and hasattr(args[0], 'request_context'):
                 ctx = args[0]
-                # Store correlation ID in context for logging
-                if hasattr(ctx, 'request_context'):
-                    ctx.request_context.correlation_id = correlation_id
 
             try:
+                # Check for correlation ID right before executing function
+                if args and hasattr(args[0], 'request_context') and hasattr(args[0].request_context, 'correlation_id'):
+                    context_correlation_id = args[0].request_context.correlation_id
+                    if context_correlation_id:
+                        correlation_id = context_correlation_id
+                        # Store in context for logging if not already there
+                        if ctx and hasattr(ctx, 'request_context') and not hasattr(ctx.request_context, 'correlation_id'):
+                            ctx.request_context.correlation_id = correlation_id
+
+                # Generate correlation ID if none exists
+                if not correlation_id:
+                    correlation_id = str(uuid.uuid4())[:8]
+                    # Store correlation ID in context for logging
+                    if ctx and hasattr(ctx, 'request_context'):
+                        ctx.request_context.correlation_id = correlation_id
+
                 return await func(*args, **kwargs)
             except MCPAtlassianAuthenticationError as auth_err:
+                # Re-capture correlation ID from context in case it was updated during function execution
+                if args and hasattr(args[0], 'request_context') and hasattr(args[0].request_context, 'correlation_id'):
+                    current_correlation_id = args[0].request_context.correlation_id
+                    if current_correlation_id:
+                        correlation_id = current_correlation_id
+
                 error_details = {
                     "success": False,
                     "error": "Authentication Failed",
@@ -238,6 +273,12 @@ def handle_tool_errors(
                 return json.dumps(error_details, indent=2, ensure_ascii=False)
 
             except HTTPError as http_err:
+                # Re-capture correlation ID from context in case it was updated during function execution
+                if args and hasattr(args[0], 'request_context') and hasattr(args[0].request_context, 'correlation_id'):
+                    current_correlation_id = args[0].request_context.correlation_id
+                    if current_correlation_id:
+                        correlation_id = current_correlation_id
+
                 status_code = http_err.response.status_code if http_err.response else "Unknown"
                 # Detect rate limiting
                 is_rate_limit = status_code == 429 or (
@@ -279,9 +320,17 @@ def handle_tool_errors(
 
                 # Add retry information for rate limiting
                 if is_rate_limit and hasattr(http_err.response, 'headers'):
-                    error_details["retry_after"] = http_err.response.headers.get('Retry-After')
-                    error_details["rate_limit_remaining"] = http_err.response.headers.get('X-RateLimit-Remaining')
-                    error_details["rate_limit_reset"] = http_err.response.headers.get('X-RateLimit-Reset')
+                    retry_after = http_err.response.headers.get('Retry-After')
+                    if retry_after:
+                        error_details["retry_after"] = retry_after
+                    # Include rate limit headers if present
+                    rate_limit_header_mapping = {
+                        'X-RateLimit-Remaining': 'rate_limit_remaining',
+                        'X-RateLimit-Reset': 'rate_limit_reset'
+                    }
+                    for header_key, field_name in rate_limit_header_mapping.items():
+                        if header_key in http_err.response.headers:
+                            error_details[field_name] = http_err.response.headers[header_key]
 
                 logger.error(
                     f"[{correlation_id}] HTTP {status_code} error in {func.__name__}: {message}",
@@ -296,6 +345,12 @@ def handle_tool_errors(
                 return json.dumps(error_details, indent=2, ensure_ascii=False)
 
             except ValueError as val_err:
+                # Re-capture correlation ID from context in case it was updated during function execution
+                if args and hasattr(args[0], 'request_context') and hasattr(args[0].request_context, 'correlation_id'):
+                    current_correlation_id = args[0].request_context.correlation_id
+                    if current_correlation_id:
+                        correlation_id = current_correlation_id
+
                 error_details = {
                     "success": False,
                     "error": "Validation Error",
@@ -313,6 +368,12 @@ def handle_tool_errors(
                 return json.dumps(error_details, indent=2, ensure_ascii=False)
 
             except Exception as e:
+                # Re-capture correlation ID from context in case it was updated during function execution
+                if args and hasattr(args[0], 'request_context') and hasattr(args[0].request_context, 'correlation_id'):
+                    current_correlation_id = args[0].request_context.correlation_id
+                    if current_correlation_id:
+                        correlation_id = current_correlation_id
+
                 error_details = {
                     "success": False,
                     "error": "Internal Error",
@@ -338,3 +399,12 @@ def handle_tool_errors(
         return wrapper  # type: ignore
 
     return decorator
+
+
+def generate_correlation_id() -> str:
+    """Generate a unique correlation ID for request tracking.
+
+    Returns:
+        An 8-character alphanumeric string for correlation tracking
+    """
+    return str(uuid.uuid4())[:8]

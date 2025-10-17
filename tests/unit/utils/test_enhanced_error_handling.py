@@ -250,7 +250,7 @@ class TestHandleToolErrorsDecorator:
         async def custom_function_name(ctx: Context):
             raise ValueError("Test error")
 
-        result = json.loads(await custom_function(mock_context))
+        result = json.loads(await custom_function_name(mock_context))
 
         assert result["tool"] == "custom_function_name"
 
@@ -267,10 +267,11 @@ class TestHandleToolErrorsDecorator:
 
         # Verify logger.error was called with correlation ID
         mock_logger.error.assert_called_once()
-        call_args = mock_logger.error.call_args[0]
-        assert call_args[1]["correlation_id"] is not None
-        assert call_args[1]["tool"] == "test_function"
-        assert call_args[1]["service"] == "TestService"
+        call_args = mock_logger.error.call_args
+        # call_args[0] is the message, call_args[1] is the extra dict
+        assert call_args[1]["extra"]["correlation_id"] is not None
+        assert call_args[1]["extra"]["tool"] == "test_function"
+        assert call_args[1]["extra"]["service"] == "TestService"
 
     @pytest.mark.asyncio
     async def test_http_error_detection_with_rate_limit_headers(self, mock_context):

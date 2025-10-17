@@ -290,8 +290,13 @@ class UserTokenMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        # Generate correlation ID for this request
-        correlation_id = str(uuid.uuid4())[:8]
+        # Check for existing correlation ID in headers
+        existing_correlation_id = request.headers.get("X-Correlation-ID")
+        if existing_correlation_id:
+            correlation_id = existing_correlation_id
+        else:
+            # Generate correlation ID for this request
+            correlation_id = str(uuid.uuid4())[:8]
         request.state.correlation_id = correlation_id
 
         logger.debug(

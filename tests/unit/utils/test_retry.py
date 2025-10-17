@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import requests
-from requests.exceptions import HTTPError, ConnectionError
+from requests.exceptions import HTTPError, ConnectionError, RequestException
 
 from mcp_atlassian.utils.retry import (
     RetryConfig,
@@ -35,7 +35,7 @@ class TestRetryConfig:
         assert config.jitter is True
         assert 429 in config.retryable_status_codes
         assert 500 in config.retryable_status_codes
-        assert HTTPError in config.retryable_exceptions
+        assert HTTPError not in config.retryable_exceptions  # HTTPError handled separately
 
     def test_custom_retry_config(self):
         """Test custom retry configuration."""
@@ -142,7 +142,9 @@ class TestIsRetryableError:
 
     def test_correlation_id_logging(self, caplog):
         """Test that correlation ID is included in debug logs."""
-        error = HTTPError("Test error")
+        response = MagicMock()
+        response.status_code = 500  # Retryable status code
+        error = HTTPError("Test error", response=response)
         with caplog.at_level(logging.DEBUG):
             result = is_retryable_error(error, RetryConfig(), correlation_id="abc123")
 
@@ -207,7 +209,7 @@ class TestAsyncRetryWithBackoff:
         mock_function = AsyncMock(return_value="success")
 
         result = await async_retry_with_backoff(
-            mock_function, DEFAULT_RETRY_CONFIG, "test123"
+            mock_function, DEFAULT_RETRY_CONFIG, correlation_id="test123"
         )
 
         assert result == "success"
@@ -226,7 +228,7 @@ class TestAsyncRetryWithBackoff:
             return "success"
 
         result = await async_retry_with_backoff(
-            failing_function, DEFAULT_RETRY_CONFIG, "test123"
+            failing_function, DEFAULT_RETRY_CONFIG, correlation_id="test123"
         )
 
         assert result == "success"
@@ -239,7 +241,7 @@ class TestAsyncRetryWithBackoff:
 
         with pytest.raises(ValueError, match="Invalid input"):
             await async_retry_with_backoff(
-                failing_function, DEFAULT_RETRY_CONFIG, "test123"
+                failing_function, DEFAULT_RETRY_CONFIG, correlation_id="test123"
             )
 
         failing_function.assert_called_once()
@@ -258,7 +260,7 @@ class TestAsyncRetryWithBackoff:
 
         with pytest.raises(ConnectionError, match="Always fails"):
             await async_retry_with_backoff(
-                always_failing_function, config, "test123"
+                always_failing_function, config, correlation_id="test123"
             )
 
         assert call_count == 2  # Should be called max_attempts times
@@ -279,7 +281,7 @@ class TestAsyncRetryWithBackoff:
         config = RetryConfig(max_attempts=3, base_delay=0.1, jitter=False)
 
         result = await async_retry_with_backoff(
-            failing_function, config, "test123"
+            failing_function, config, correlation_id="test123"
         )
 
         assert result == "success"

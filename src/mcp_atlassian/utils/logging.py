@@ -64,11 +64,14 @@ def mask_sensitive(value: str | None, keep_chars: int = 4) -> str:
     if not value:
         return "Not Provided"
     if len(value) <= keep_chars * 2:
+        # For short values, mask completely
         return "*" * len(value)
-    start = value[:keep_chars]
-    end = value[-keep_chars:]
-    middle = "*" * (len(value) - keep_chars * 2)
-    return f"{start}{middle}{end}"
+    else:
+        # For longer values, show first and last keep_chars
+        start = value[:keep_chars]
+        end = value[-keep_chars:]
+        middle_length = len(value) - (keep_chars * 2)
+        return f"{start}{'*' * middle_length}{end}"
 
 
 def get_masked_session_headers(headers: dict[str, str]) -> dict[str, str]:
@@ -88,13 +91,20 @@ def get_masked_session_headers(headers: dict[str, str]) -> dict[str, str]:
             if key == "Authorization":
                 # Preserve auth type but mask the credentials
                 if value.startswith("Basic "):
-                    masked_headers[key] = f"Basic {mask_sensitive(value[6:])}"
+                    token = value[6:]
+                    masked_headers[key] = f"Basic {mask_sensitive(token)}"
                 elif value.startswith("Bearer "):
-                    masked_headers[key] = f"Bearer {mask_sensitive(value[7:])}"
+                    token = value[7:]
+                    masked_headers[key] = f"Bearer {mask_sensitive(token)}"
+                else:
+                    # Unknown auth type - mask completely
+                    masked_headers[key] = "*****"
+            else:
+                # For cookies and other sensitive headers, mask completely
+                if key in {"Cookie", "Set-Cookie"}:
+                    masked_headers[key] = "*****"
                 else:
                     masked_headers[key] = mask_sensitive(value)
-            else:
-                masked_headers[key] = mask_sensitive(value)
         else:
             masked_headers[key] = str(value)
 
@@ -113,13 +123,13 @@ class StructuredFormatter(logging.Formatter):
             "logger": record.name,
             "message": record.getMessage(),
             "module": record.module,
-            "function": record.funcName,
+            "function": record.funcName or "<module>",
             "line": record.lineno,
         }
 
-        # Add correlation ID if available
+        # Include correlation ID only if set
         correlation_id = getattr(record, 'correlation_id', None)
-        if correlation_id:
+        if correlation_id is not None:
             log_entry["correlation_id"] = correlation_id
 
         # Add extra fields

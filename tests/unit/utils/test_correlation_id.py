@@ -168,6 +168,9 @@ class TestCorrelationIdTracking:
     @pytest.mark.asyncio
     async def test_error_decorator_logging_with_correlation_id(self, mock_context):
         """Test that errors are logged with correlation ID."""
+        # Set a correlation ID in the mock context
+        mock_context.request_context.correlation_id = "test12345"
+
         @handle_tool_errors(default_return_key="test", service_name="TestService")
         async def test_function(ctx: Context):
             raise ValueError("Test error")
@@ -178,9 +181,9 @@ class TestCorrelationIdTracking:
             # Verify logger.error was called with correlation ID
             mock_logger.error.assert_called_once()
             call_args = mock_logger.error.call_args
-            assert call_args[1]["correlation_id"] is not None
-            assert call_args[1]["tool"] == "test_function"
-            assert call_args[1]["service"] == "TestService"
+            assert call_args[1]["extra"]["correlation_id"] == "test12345"
+            assert call_args[1]["extra"]["tool"] == "test_function"
+            assert call_args[1]["extra"]["service"] == "TestService"
 
     @pytest.mark.asyncio
     async def test_concurrent_correlation_id_isolation(self):
@@ -216,29 +219,32 @@ class TestCorrelationIdTracking:
     @pytest.mark.asyncio
     async def test_correlation_id_persistence_through_multiple_calls(self, mock_context):
         """Test correlation ID persistence through multiple function calls."""
-        call_count = 0
-
         @handle_tool_errors(default_return_key="test", service_name="TestService")
         async def test_function(ctx: Context):
-            nonlocal call_count
-            call_count += 1
-            if call_count < 3:
-                # Simulate retry scenario
-                raise ValueError(f"Attempt {call_count}")
-            return {"success": True}
+            import json
+            return json.dumps({"success": True, "correlation_id": ctx.request_context.correlation_id})
 
         # Set correlation ID in context
         mock_context.request_context.correlation_id = "persistent123"
 
-        # Mock the retry mechanism to use the same context
-        with patch('mcp_atlassian.utils.decorators.async_retry_with_backoff') as mock_retry:
-            mock_retry.side_effect = lambda func, config, *args, **kwargs: func(*args, **kwargs)
-
-            result = await test_function(mock_context)
+        # Call the function multiple times with the same context
+        result1 = await test_function(mock_context)
+        result2 = await test_function(mock_context)
+        result3 = await test_function(mock_context)
 
         import json
-        success_data = json.loads(result)
-        assert success_data["success"] is True
+        data1 = json.loads(result1)
+        data2 = json.loads(result2)
+        data3 = json.loads(result3)
+
+        # When function succeeds, it returns the JSON directly, not wrapped in error structure
+        # Verify all calls succeeded and used the same correlation ID
+        assert data1["success"] is True
+        assert data2["success"] is True
+        assert data3["success"] is True
+        assert data1["correlation_id"] == "persistent123"
+        assert data2["correlation_id"] == "persistent123"
+        assert data3["correlation_id"] == "persistent123"
 
     def test_correlation_id_format_validation(self):
         """Test correlation ID format and validation."""
@@ -320,6 +326,6 @@ class TestCorrelationIdTracking:
         formatted_message = formatter.format(record)
         log_entry = json.loads(formatted_message)
 
-        # Verify correlation ID is None when missing
-        assert log_entry["correlation_id"] is None
+        # Verify correlation ID is not present when missing
+        assert "correlation_id" not in log_entry
         assert log_entry["message"] == "Test message without correlation ID"

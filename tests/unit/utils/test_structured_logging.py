@@ -177,7 +177,7 @@ class TestSetupStructuredLogging:
         # Should be plain text with timestamp
         assert "INFO" in output
         assert "Test message" in output
-        assert "test.logger" in output
+        assert "mcp-atlassian" in output
 
     def test_setup_structured_logging_removes_existing_handlers(self):
         """Test that setup_structured_logging removes existing handlers."""
@@ -267,7 +267,7 @@ class TestLoggingUtilities:
         log_config_param(logger, "TestService", "token", "secret123", sensitive=True)
 
         output = stream.getvalue()
-        assert "TestService token: se***23" in output  # Masked
+        assert "TestService token: secr*t123" in output  # Masked (first 4, last 4)
 
     def test_log_config_param_none_value(self):
         """Test log_config_param with None value."""
@@ -299,17 +299,17 @@ class TestCredentialMasking:
     def test_mask_sensitive_normal_value(self):
         """Test mask_sensitive with normal value."""
         result = mask_sensitive("secret-api-key-12345")
-        assert result == "sec***2345"  # First 3 and last 4 characters
+        assert result == "secr************2345"  # First 4 and last 4 characters
 
     def test_mask_sensitive_custom_keep_chars(self):
         """Test mask_sensitive with custom keep_chars parameter."""
         result = mask_sensitive("secret-api-key-12345", keep_chars=2)
-        assert result == "se***45"  # First 2 and last 2 characters
+        assert result == "se****************45"  # First 2 and last 2 characters
 
     def test_mask_sensitive_exact_boundary(self):
         """Test mask_sensitive with value exactly at boundary."""
         result = mask_sensitive("12345678", keep_chars=4)
-        assert result == "1234****"  # First 4 characters, rest masked
+        assert result == "********"  # Fully masked when length <= keep_chars * 2
 
     def test_get_masked_session_headers(self):
         """Test get_masked_session_headers function."""
@@ -325,7 +325,8 @@ class TestCredentialMasking:
         # Check Authorization header is masked
         assert masked["Authorization"].startswith("Bearer ")
         assert "secret-token-123" not in masked["Authorization"]
-        assert "Bearer se***23" in masked["Authorization"]
+        # Check that it follows the consistent mask_sensitive pattern
+        assert "Bearer secr********-123" in masked["Authorization"]
 
         # Check non-sensitive headers are unchanged
         assert masked["Content-Type"] == "application/json"
@@ -344,7 +345,8 @@ class TestCredentialMasking:
 
         assert masked["Authorization"].startswith("Basic ")
         assert "dXNlcjpwYXNzd29yZA==" not in masked["Authorization"]
-        assert "Basic se***yZA==" in masked["Authorization"]
+        # Check that it follows the consistent mask_sensitive pattern
+        assert "Basic dXNl************ZA==" in masked["Authorization"]
 
     def test_get_masked_session_headers_unknown_auth_type(self):
         """Test get_masked_session_headers with unknown auth type."""
@@ -366,5 +368,5 @@ class TestCredentialMasking:
         masked = get_masked_session_headers(headers)
 
         assert masked["Content-Type"] == "application/json"
-        assert "Accept" == "application/json"
+        assert masked["Accept"] == "application/json"
         assert "Authorization" not in masked

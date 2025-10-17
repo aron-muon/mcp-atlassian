@@ -517,10 +517,10 @@ class TestMCPProtocolIntegration:
         # Verify error response
         assert response.status_code == 401
         body = json.loads(response.body)
-        assert "error" in body
+        assert "message" in body
         assert (
             "Only 'Bearer <OAuthToken>' or 'Token <PAT>' types are supported"
-            in body["error"]
+            in body["message"]
         )
 
     async def test_middleware_empty_token(self):
@@ -550,8 +550,8 @@ class TestMCPProtocolIntegration:
         # Verify error response
         assert response.status_code == 401
         body = json.loads(response.body)
-        assert "error" in body
-        assert "Empty Bearer token" in body["error"]
+        assert "message" in body
+        assert "Empty Bearer token" in body["message"]
 
     async def test_middleware_non_mcp_path(self):
         """Test UserTokenMiddleware bypasses non-MCP paths."""

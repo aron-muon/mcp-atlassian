@@ -58,7 +58,7 @@ class RetryConfig:
             }
         self.retryable_status_codes = retryable_status_codes
 
-        # Default retryable exceptions
+        # Default retryable exceptions (HTTPError handled separately for status code logic)
         if retryable_exceptions is None:
             retryable_exceptions = (
                 RequestException,
@@ -82,14 +82,7 @@ def is_retryable_error(
     Returns:
         True if the error is retryable, False otherwise
     """
-    # Check for retryable exceptions
-    if isinstance(error, config.retryable_exceptions):
-        logger.debug(
-            f"[{correlation_id}] Retryable exception detected: {type(error).__name__}: {error}"
-        )
-        return True
-
-    # Check for HTTP errors with retryable status codes
+    # Check for HTTP errors with retryable status codes first
     if isinstance(error, HTTPError) and hasattr(error, 'response') and error.response is not None:
         status_code = error.response.status_code
         if status_code in config.retryable_status_codes:
@@ -98,14 +91,36 @@ def is_retryable_error(
             )
             return True
 
-        # Check for rate limit headers
+        # Check for rate limit headers (handle various header names and value types)
         if hasattr(error.response, 'headers'):
-            rate_limit_remaining = error.response.headers.get('X-RateLimit-Remaining')
-            if rate_limit_remaining == '0':
-                logger.debug(
-                    f"[{correlation_id}] Rate limit exhausted (X-RateLimit-Remaining: 0)"
-                )
-                return True
+            rate_limit_headers = [
+                'X-RateLimit-Remaining',
+                'x-ratelimit-remaining',
+                'X-Rate-Limit-Remaining',
+                'Rate-Limit-Remaining',
+                'X-Rate-Remaining',
+                'RateLimit-Remaining',
+            ]
+
+            for header_name in rate_limit_headers:
+                rate_limit_remaining = error.response.headers.get(header_name)
+                if rate_limit_remaining is not None:
+                    try:
+                        if str(rate_limit_remaining) == '0' or int(rate_limit_remaining) == 0:
+                            logger.debug(
+                                f"[{correlation_id}] Rate limit exhausted ({header_name}: 0)"
+                            )
+                            return True
+                    except (ValueError, TypeError):
+                        # If we can't parse the value, continue with other checks
+                        pass
+
+    # Check for retryable exceptions (excluding HTTPError which was handled above)
+    if isinstance(error, config.retryable_exceptions) and not isinstance(error, HTTPError):
+        logger.debug(
+            f"[{correlation_id}] Retryable exception detected: {type(error).__name__}: {error}"
+        )
+        return True
 
     return False
 
