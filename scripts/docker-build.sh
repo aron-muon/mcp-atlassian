@@ -22,7 +22,6 @@ fi
 echo "📦 Building image using Dockerfile..."
 docker build \
     --tag "${FULL_IMAGE_NAME}" \
-    --progress=plain \
     .
 
 # Verify the image was built successfully

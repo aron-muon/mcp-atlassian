@@ -728,3 +728,39 @@ async def test_add_issues_to_sprint(jira_client, mock_jira_fetcher):
     mock_jira_fetcher.add_issues_to_sprint.assert_called_once_with(
         sprint_id="123", issues=["TEST-1", "TEST-2"]
     )
+
+
+@pytest.mark.anyio
+async def test_search_upstream_interface(jira_client, mock_jira_fetcher):
+    """Test the search tool (upstream interface) with fixture data."""
+    response = await jira_client.call_tool(
+        "jira_search",
+        {
+            "jql": "project = TEST",
+            "fields": "summary,status",
+            "limit": 10,
+            "start_at": 0,
+        },
+    )
+    assert isinstance(response, list)
+    assert len(response) > 0
+    text_content = response[0]
+    assert text_content.type == "text"
+    content = json.loads(text_content.text)
+    assert isinstance(content, dict)
+    assert content["success"] is True
+    assert "search_results" in content
+    assert isinstance(content["search_results"]["issues"], list)
+    assert len(content["search_results"]["issues"]) >= 1
+    assert content["search_results"]["issues"][0]["key"] == "PROJ-123"
+    assert content["search_results"]["total"] > 0
+    assert content["search_results"]["start_at"] == 0
+    assert content["search_results"]["max_results"] == 10
+    mock_jira_fetcher.search_issues.assert_called_once_with(
+        jql="project = TEST",
+        fields="summary,status",
+        start=0,
+        limit=10,
+        expand=None,
+        projects_filter=None,
+    )
