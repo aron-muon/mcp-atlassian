@@ -3,7 +3,7 @@
 Test script to verify Atlassian Server/DC PAT authentication.
 
 Usage:
-    python test_server_pat.py
+    python tests/test_server_pat.py
 
 Requires environment variables:
     - JIRA_URL or CONFLUENCE_URL
@@ -16,7 +16,7 @@ import logging
 from pathlib import Path
 
 # Add the src directory to Python path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Set up logging
 logging.basicConfig(

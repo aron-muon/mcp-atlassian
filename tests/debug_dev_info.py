@@ -12,7 +12,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 # Add the src directory to Python path
-sys.path.insert(0, str(Path(__file__).parent / "src"))
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 # Set up detailed logging
 logging.basicConfig(
@@ -153,8 +153,8 @@ def test_raw_dev_endpoint(issue_key):
 def main():
     """Main test function."""
     if len(sys.argv) < 2:
-        print("Usage: python debug_dev_info.py ISSUE-KEY")
-        print("Example: python debug_dev_info.py LQC-25567")
+        print("Usage: python tests/debug_dev_info.py ISSUE-KEY")
+        print("Example: python tests/debug_dev_info.py LQC-25567")
         sys.exit(1)
     
     issue_key = sys.argv[1]
