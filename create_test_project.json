@@ -1,0 +1,8 @@
+{
+  "key": "TEST",
+  "name": "Software Development Test",
+  "description": "Software development focused test space for MCP Atlassian testing with epics support",
+  "projectTypeKey": "software",
+  "projectTemplateKey": "com.pyxis.greenhopper.jira:gh-simplified-agility-scrum",
+  "assigneeType": "PROJECT_LEAD"
+}

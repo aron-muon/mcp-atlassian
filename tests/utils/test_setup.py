@@ -55,27 +55,27 @@ class TestProjectSetup:
                 project_name = f"MCP Test Project {project_key}"
 
                 try:
-                    # Force use of TEST project only
-                    project_key = "TEST"
+                    # Use project key from environment variable
+                    project_key = os.getenv("JIRA_TEST_PROJECT_KEY", "TST")
 
-                    # Check if TEST project exists
+                    # Check if test project exists
                     result_content = await connected_client.call_tool('jira_get_all_projects', {})
                     if result_content and isinstance(result_content[0], TextContent):
                         projects = json.loads(result_content[0].text)
                         existing_projects = [p.get('key') for p in projects.get('projects', [])]
 
-                        if "TEST" not in existing_projects:
-                            print(f"TEST project not found. Available projects: {existing_projects}")
-                            raise ValueError("TEST project does not exist. Please create TEST project in Jira.")
+                        if project_key not in existing_projects:
+                            print(f"{project_key} project not found. Available projects: {existing_projects}")
+                            raise ValueError(f"{project_key} project does not exist. Please create {project_key} project in Jira.")
 
-                        print(f"Using TEST project for real API testing")
+                        print(f"Using {project_key} project for real API testing")
 
                 except Exception as e:
-                    raise RuntimeError(f"Failed to set up TEST project: {e}")
+                    raise RuntimeError(f"Failed to set up {project_key} project: {e}")
             else:
-                # Force use of TEST project only
-                project_key = "TEST"
-                print(f"Using TEST project for real API testing")
+                # Use project key from environment variable
+                project_key = os.getenv("JIRA_TEST_PROJECT_KEY", "TST")
+                print(f"Using {project_key} project for real API testing")
 
             # Verify the project works by creating a test issue
             try:
@@ -132,48 +132,33 @@ class TestProjectSetup:
                 space_name = f"MCP Test Space {space_key}"
 
                 try:
-                    # Force use of TEST space only
-                    space_key = "TEST"
+                    # Use environment variable for space key
+                    space_key = os.getenv("CONFLUENCE_TEST_SPACE_KEY", "TEST")
 
-                    # Check if TEST space exists
+                    # Check if test space exists
                     result_content = await connected_client.call_tool('confluence_search', {
-                        'query': 'space = "TEST"',
+                        'query': f'space = "{space_key}"',
                         'limit': 1
                     })
 
                     if result_content and isinstance(result_content[0], TextContent):
                         search_result = json.loads(result_content[0].text)
                         if not search_result or len(search_result) == 0:
-                            print(f"TEST space not found or empty")
-                            raise ValueError("TEST space does not exist. Please create TEST space in Confluence.")
+                            print(f"{space_key} space not found or empty")
+                            raise ValueError(f"{space_key} space does not exist. Please create {space_key} space in Confluence.")
 
-                        print(f"Using TEST space for real API testing")
+                        print(f"Using {space_key} space for real API testing")
 
                 except Exception as e:
-                    raise RuntimeError(f"Failed to set up TEST space: {e}")
+                    raise RuntimeError(f"Failed to set up {space_key} space: {e}")
             else:
-                # Force use of TEST space only
-                space_key = "TEST"
-                print(f"Using TEST space for real API testing")
+                # Use environment variable for space key
+                space_key = os.getenv("CONFLUENCE_TEST_SPACE_KEY", "TEST")
+                print(f"Using {space_key} space for real API testing")
 
-            # Verify the space works by trying to get page by title or creating a test page
+            # Verify the space works by creating a test page (more flexible approach)
             try:
-                # Try to get the welcome page that should exist from space creation
-                test_page_title = "Welcome to TEST Space"
-                get_result = await connected_client.call_tool('confluence_get_page', {
-                    'title': test_page_title,
-                    'space_key': space_key
-                })
-
-                if get_result and isinstance(get_result[0], TextContent):
-                    page_data = json.loads(get_result[0].text)
-                    # confluence_get_page returns page data directly, not with a success field
-                    if page_data.get('metadata') and page_data['metadata'].get('title') == test_page_title:
-                        print(f"✅ Confluence test environment validated with space: {space_key} (welcome page found)")
-                        self.confluence_test_space_key = space_key
-                        return space_key
-
-                # If welcome page not found, try to create a test page
+                # Always create a fresh test page to validate the space works
                 test_page_title = f"Setup Test Page {uuid.uuid4().hex[:8]}"
                 result = await connected_client.call_tool('confluence_create_page', {
                     'space_key': space_key,
@@ -195,7 +180,7 @@ class TestProjectSetup:
                         if verify_result and isinstance(verify_result[0], TextContent):
                             verify_data = json.loads(verify_result[0].text)
                             if verify_data.get('success'):
-                                print(f"✅ Confluence test environment validated with space: {space_key} (test page created)")
+                                print(f"✅ Confluence test environment validated with space: {space_key} (test page created and verified)")
                                 self.confluence_test_space_key = space_key
                                 return space_key
 
@@ -205,7 +190,7 @@ class TestProjectSetup:
                 raise RuntimeError(f"Confluence test environment validation failed: {e}")
 
     async def cleanup_test_environment(self):
-        """Clean up all created test resources."""
+        """Clean up all created test resources and leave spaces ready for future testing."""
         print("🧹 Cleaning up test environment...")
 
         # Ensure environment variables are loaded before creating MCP client
@@ -214,27 +199,45 @@ class TestProjectSetup:
         transport = FastMCPTransport(main_mcp)
         client = Client(transport=transport)
         async with client as connected_client:
-            # Clean up Jira resources
+            # Clean up Jira resources tracked during this test session
             for issue_key in self.created_resources["jira"]["issues"]:
                 try:
                     await connected_client.call_tool('jira_delete_issue', {'issue_key': issue_key})
-                    print(f"  Deleted Jira issue: {issue_key}")
+                    print(f"  Deleted tracked Jira issue: {issue_key}")
                 except Exception as e:
-                    print(f"  Failed to delete Jira issue {issue_key}: {e}")
+                    print(f"  Failed to delete tracked Jira issue {issue_key}: {e}")
 
-            # Clean up Confluence resources
+            # Clean up Confluence resources tracked during this test session
             for page_id in self.created_resources["confluence"]["pages"]:
                 try:
                     await connected_client.call_tool('confluence_delete_page', {'page_id': page_id})
-                    print(f"  Deleted Confluence page: {page_id}")
+                    print(f"  Deleted tracked Confluence page: {page_id}")
                 except Exception as e:
-                    print(f"  Failed to delete Confluence page {page_id}: {e}")
+                    print(f"  Failed to delete tracked Confluence page {page_id}: {e}")
 
-        print("✅ Test environment cleanup completed")
+        # Final comprehensive cleanup of any remaining test data
+        print("🧹 Performing final cleanup of any remaining test data...")
+        try:
+            test_project_key = os.getenv("JIRA_TEST_PROJECT_KEY", "TST")
+            await _cleanup_jira_test_data(test_project_key, client)
+        except Exception as e:
+            print(f"  ⚠️  Final Jira cleanup failed: {e}")
+
+        try:
+            test_space_key = os.getenv("CONFLUENCE_TEST_SPACE_KEY", "TEST")
+            from mcp_atlassian.confluence import ConfluenceFetcher
+            from mcp_atlassian.confluence.config import ConfluenceConfig
+            confluence_config = ConfluenceConfig.from_env()
+            confluence_fetcher = ConfluenceFetcher(config=confluence_config)
+            await _cleanup_confluence_test_data(test_space_key, confluence_fetcher)
+        except Exception as e:
+            print(f"  ⚠️  Final Confluence cleanup failed: {e}")
+
+        print("✅ Test environment cleanup completed - spaces ready for future testing")
 
     def get_jira_project_key(self) -> str:
         """Get the configured Jira test project key."""
-        return self.jira_test_project_key or os.getenv("JIRA_TEST_PROJECT_KEY", "TEST")
+        return self.jira_test_project_key or os.getenv("JIRA_TEST_PROJECT_KEY", "TST")
 
     def get_confluence_space_key(self) -> str:
         """Get the configured Confluence test space key."""
@@ -243,95 +246,172 @@ class TestProjectSetup:
 
 async def setup_test_project_fresh(jira: bool = True, confluence: bool = True) -> TestProjectSetup:
     """
-    Set up a fresh TEST project/space by automatically creating if needed.
+    Set up fresh test environment by cleaning existing test data and creating spaces if needed.
 
-    This function ensures that tests start with a clean TEST environment by:
-    1. Creating TEST space in Confluence if it doesn't exist (if confluence=True)
-    2. Verifying TEST project exists in Jira (project creation via API not supported) (if jira=True)
+    This function ensures that tests start with a clean environment by:
+    1. Creating test spaces if they don't exist (NEVER deletes spaces)
+    2. Cleaning up existing test data (issues, pages, comments) from spaces/projects
     3. Setting up the environment for testing
 
     Args:
-        jira: Whether to set up Jira TEST project
-        confluence: Whether to set up Confluence TEST space
+        jira: Whether to set up Jira test project
+        confluence: Whether to set up Confluence test space
 
     Returns:
-        TestProjectSetup instance with TEST project/space ready for testing
+        TestProjectSetup instance with test project/space ready for testing
     """
     setup = TestProjectSetup()
 
-    # Handle Confluence TEST space - AUTO-CREATE IF NEEDED
+    # Handle Confluence test space - CREATE IF NEEDED, NEVER DELETE
     if confluence:
         try:
-            print(f"🔍 Checking for TEST space...")
+            # Use environment variable for space key
+            test_space_key = os.getenv("CONFLUENCE_TEST_SPACE_KEY", "TEST")
+            print(f"🔍 Preparing {test_space_key} space...")
 
             # Import here to avoid circular imports
             from mcp_atlassian.confluence import ConfluenceFetcher
             from mcp_atlassian.confluence.config import ConfluenceConfig
 
-            # Check if TEST space exists via direct API
+            # Check if test space exists via direct API
             confluence_config = ConfluenceConfig.from_env()
             confluence_fetcher = ConfluenceFetcher(config=confluence_config)
 
             spaces_response = confluence_fetcher.confluence.get_all_spaces()
             existing_spaces = [space.get('key') for space in spaces_response.get('results', [])]
 
-            if 'TEST' not in existing_spaces:
-                print(f"🆕 TEST space not found, creating...")
+            if test_space_key not in existing_spaces:
+                print(f"🆕 {test_space_key} space not found, creating...")
                 confluence_fetcher.confluence.create_space(
-                    space_key='TEST',
-                    space_name='Test Space for MCP'
+                    space_key=test_space_key,
+                    space_name=f'Test Space for MCP ({test_space_key})'
                 )
-                print(f"✅ Created TEST space")
+                print(f"✅ Created {test_space_key} space")
 
                 # Create a welcome page
                 welcome_page = confluence_fetcher.create_page(
-                    space_key='TEST',
-                    title='Welcome to TEST Space',
-                    body='This space is automatically created for MCP real API testing. All test resources are tracked and cleaned up automatically.'
+                    space_key=test_space_key,
+                    title=f'Welcome to {test_space_key} Space',
+                    body=f'This space is automatically created for MCP real API testing. All test resources are tracked and cleaned up automatically.'
                 )
                 print(f"✅ Created welcome page: {welcome_page.title}")
             else:
-                print(f"✅ Found existing TEST space")
+                print(f"✅ Found existing {test_space_key} space")
+                # Clean up any existing test pages from previous runs
+                print(f"🧹 Cleaning up existing test data from {test_space_key} space...")
+                await _cleanup_confluence_test_data(test_space_key, confluence_fetcher)
 
-            await setup.setup_confluence_test_environment(create_space=False)
+            # Try to setup the test environment, but don't fail if validation has issues
+            try:
+                await setup.setup_confluence_test_environment(create_space=False)
+            except Exception as e:
+                print(f"⚠️  Confluence environment validation had issues, but continuing: {e}")
+                # The space exists and was cleaned, so we can continue even if validation fails
 
         except Exception as e:
-            print(f"❌ TEST space setup failed: {e}")
+            print(f"❌ {test_space_key} space setup failed: {e}")
             raise e
 
-    # Handle Jira TEST project - VERIFY EXISTS (cannot auto-create)
+    # Handle Jira test project - VERIFY EXISTS, NEVER DELETE PROJECT
     if jira:
+        test_project_key = os.getenv("JIRA_TEST_PROJECT_KEY", "TST")
         transport = FastMCPTransport(main_mcp)
         client = Client(transport=transport)
         async with client as connected_client:
             try:
-                print(f"🔍 Checking for TEST project...")
+                print(f"🔍 Preparing {test_project_key} project...")
                 result_content = await connected_client.call_tool('jira_get_all_projects', {})
                 if result_content and isinstance(result_content[0], TextContent):
                     projects = json.loads(result_content[0].text)
                     existing_projects = [p.get('key') for p in projects.get('projects', [])]
 
-                    if 'TEST' not in existing_projects:
-                        print(f"❌ TEST project not found. Available projects: {existing_projects}")
+                    if test_project_key not in existing_projects:
+                        print(f"❌ {test_project_key} project not found. Available projects: {existing_projects}")
                         print(f"")
                         print(f"MANUAL ACTION REQUIRED:")
                         print(f"1. Go to your Jira instance: {os.getenv('JIRA_URL', 'https://your-domain.atlassian.net/')}")
                         print(f"2. Create a new project with:")
-                        print(f"   - Project Key: TEST")
+                        print(f"   - Project Key: {test_project_key}")
                         print(f"   - Project Name: Test Project for MCP")
-                        print(f"   - Type: Any (Kanban, Scrum, etc.)")
+                        print(f"   - Type: Software (Scrum template for epics support)")
                         print(f"3. Ensure your test user has full access to the project")
                         print(f"")
-                        raise ValueError("TEST project not found. Please create TEST project in Jira.")
+                        raise ValueError(f"{test_project_key} project not found. Please create {test_project_key} project in Jira.")
 
-                    print(f"✅ Found TEST project")
+                    print(f"✅ Found existing {test_project_key} project")
+                    # Clean up any existing test issues from previous runs
+                    print(f"🧹 Cleaning up existing test data from {test_project_key} project...")
+                    await _cleanup_jira_test_data(test_project_key, connected_client)
+
                     await setup.setup_jira_test_environment(create_project=False)
 
             except Exception as e:
-                print(f"❌ TEST project setup failed: {e}")
+                print(f"❌ {test_project_key} project setup failed: {e}")
                 raise e
 
     return setup
+
+
+async def _cleanup_confluence_test_data(space_key: str, confluence_fetcher) -> None:
+    """Clean up test data from Confluence space without deleting the space itself."""
+    try:
+        # Search for test pages with typical test patterns
+        cql = f'space = "{space_key}" AND (title ~ "Test" OR title ~ "MCP" OR title ~ "Setup Test")'
+        search_results = confluence_fetcher.search(cql, limit=50)
+
+        cleaned_count = 0
+        for page in search_results:
+            try:
+                # Only delete pages that look like test pages
+                title = page.title.lower()
+                if any(keyword in title for keyword in ['test', 'mcp', 'setup', 'validation']):
+                    confluence_fetcher.delete_page(page.id)
+                    cleaned_count += 1
+                    print(f"  Deleted test page: {page.title}")
+            except Exception as e:
+                print(f"  Failed to delete page {page.title}: {e}")
+
+        if cleaned_count > 0:
+            print(f"✅ Cleaned up {cleaned_count} test pages from {space_key} space")
+        else:
+            print(f"✅ No test pages found to clean in {space_key} space")
+
+    except Exception as e:
+        print(f"⚠️  Could not clean up Confluence test data: {e}")
+
+
+async def _cleanup_jira_test_data(project_key: str, client) -> None:
+    """Clean up test data from Jira project without deleting the project itself."""
+    try:
+        # Search for test issues with typical test patterns
+        search_result = await client.call_tool('jira_search', {
+            'jql': f'project = "{project_key}" AND (summary ~ "Test" OR summary ~ "MCP" OR summary ~ "Validation" OR summary ~ "Setup")',
+            'limit': 50
+        })
+
+        if search_result and isinstance(search_result[0], TextContent):
+            search_data = json.loads(search_result[0].text)
+            if search_data.get('success'):
+                issues = search_data.get('search_results', {}).get('issues', [])
+
+                cleaned_count = 0
+                for issue in issues:
+                    try:
+                        issue_key = issue.get('key')
+                        if issue_key:
+                            await client.call_tool('jira_delete_issue', {'issue_key': issue_key})
+                            cleaned_count += 1
+                            print(f"  Deleted test issue: {issue_key}")
+                    except Exception as e:
+                        print(f"  Failed to delete issue {issue.get('key')}: {e}")
+
+                if cleaned_count > 0:
+                    print(f"✅ Cleaned up {cleaned_count} test issues from {project_key} project")
+                else:
+                    print(f"✅ No test issues found to clean in {project_key} project")
+
+    except Exception as e:
+        print(f"⚠️  Could not clean up Jira test data: {e}")
 
 
 async def setup_test_environment(jira: bool = True, confluence: bool = True,

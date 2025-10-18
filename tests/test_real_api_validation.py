@@ -164,14 +164,20 @@ def test_page_id() -> str:
 
 @pytest.fixture
 def test_project_key() -> str:
-    """Get test Jira project key - uses TEST project for real API validation."""
-    return "TEST"
+    """Get test Jira project key from environment variable."""
+    project_key = os.environ.get("JIRA_TEST_PROJECT_KEY")
+    if not project_key:
+        pytest.skip("JIRA_TEST_PROJECT_KEY environment variable not set")
+    return project_key
 
 
 @pytest.fixture
 def test_space_key() -> str:
-    """Get test Confluence space key - uses TEST space for real API validation."""
-    return "TEST"
+    """Get test Confluence space key from environment variable."""
+    space_key = os.environ.get("CONFLUENCE_TEST_SPACE_KEY")
+    if not space_key:
+        pytest.skip("CONFLUENCE_TEST_SPACE_KEY environment variable not set")
+    return space_key
 
 
 @pytest.fixture
@@ -251,11 +257,11 @@ class TestRealJiraValidation:
         if not use_real_jira_data:
             pytest.skip("Real Jira data testing is disabled")
 
-        # Use a dedicated TEST project for real API validation
-        test_project = "TEST"
+        # Use a dedicated test project for real API validation
+        test_project = os.environ.get("JIRA_TEST_PROJECT_KEY", "TST")
         issue_key = os.environ.get("JIRA_TEST_ISSUE_KEY")
 
-        # First try to find an existing issue in the TEST project
+        # First try to find an existing issue in the TST project
         if not issue_key:
             # Search for any issue in the TEST project
             search_result = await call_tool(
@@ -267,9 +273,9 @@ class TestRealJiraValidation:
                 if search_data.get("success") and search_data.get("search_results", {}).get("issues"):
                     issue_key = search_data["search_results"]["issues"][0]["key"]
                 else:
-                    pytest.skip("No issues found in TEST project. Create a TEST project in Jira for real API validation.")
+                    pytest.skip(f"No issues found in {test_project} project. Create a {test_project} project in Jira for real API validation.")
             else:
-                pytest.skip("Failed to search for issues in TEST project")
+                pytest.skip(f"Failed to search for issues in {test_project} project")
 
         result_content = await call_tool(
             api_validation_client, "jira_get_issue", {"issue_key": issue_key}, timeout=10.0
@@ -296,8 +302,8 @@ class TestRealJiraValidation:
         if not use_real_jira_data:
             pytest.skip("Real Jira data testing is disabled")
 
-        # Use a dedicated TEST project for real API validation
-        test_project = "TEST"
+        # Use a dedicated test project for real API validation
+        test_project = os.environ.get("JIRA_TEST_PROJECT_KEY", "TST")
         jql = f'project = "{test_project}" ORDER BY created DESC'
         result_content = await call_tool(
             api_validation_client, "jira_search", {"jql": jql, "limit": 5}
@@ -313,7 +319,7 @@ class TestRealJiraValidation:
             assert isinstance(search_data["search_results"]["issues"], list)
 
             if len(search_data["search_results"]["issues"]) == 0:
-                pytest.skip(f"No issues found in TEST project. Create a TEST project in Jira for real API validation.")
+                pytest.skip(f"No issues found in {test_project} project. Create a {test_project} project in Jira for real API validation.")
 
             for issue_dict in search_data["search_results"]["issues"]:
                 assert isinstance(issue_dict, dict)
@@ -328,7 +334,9 @@ class TestRealJiraValidation:
         if not use_real_jira_data:
             pytest.skip("Real Jira data testing is disabled")
 
-        issue_key = os.environ.get("JIRA_TEST_ISSUE_KEY", "TEST-1")
+        issue_key = os.environ.get("JIRA_TEST_ISSUE_KEY")
+        if not issue_key:
+            pytest.skip("JIRA_TEST_ISSUE_KEY environment variable not set")
 
         result_content = await call_tool(
             api_validation_client,
@@ -545,7 +553,7 @@ async def test_jira_create_issue(
         assert retrieved_issue.summary == summary
     except Exception as e:
         if "does not exist" in str(e).lower() or "project" in str(e).lower():
-            pytest.skip(f"TEST project does not exist in Jira. Create a TEST project for real API validation.")
+            pytest.skip(f"{test_project_key} project does not exist in Jira. Create a {test_project_key} project for real API validation.")
         else:
             raise
     finally:
@@ -775,13 +783,13 @@ async def test_confluence_create_page(
             )
         except Exception as e:
             if "permission" in str(e).lower():
-                pytest.skip(f"No permission to create pages in TEST space")
+                pytest.skip(f"No permission to create pages in {test_space_key} space")
                 return
             elif "space" in str(e).lower() and (
                 "not found" in str(e).lower() or "doesn't exist" in str(e).lower()
             ):
                 pytest.skip(
-                    f"TEST space not found in Confluence. Create a TEST space for real API validation."
+                    f"{test_space_key} space not found in Confluence. Create a {test_space_key} space for real API validation."
                 )
                 return
             else:
@@ -1129,8 +1137,8 @@ class TestRealToolValidation:
         if not use_real_jira_data:
             pytest.skip("Real Jira data testing is disabled")
 
-        # Use a dedicated TEST project for real API validation
-        test_project = "TEST"
+        # Use a dedicated test project for real API validation
+        test_project = os.environ.get("JIRA_TEST_PROJECT_KEY", "TST")
         jql = f'project = "{test_project}" ORDER BY created ASC'
         limit = 1
 
@@ -1174,8 +1182,8 @@ class TestRealToolValidation:
 
         limit = 1
 
-        # Use a dedicated TEST project for real API validation
-        test_project = "TEST"
+        # Use a dedicated test project for real API validation
+        test_project = os.environ.get("JIRA_TEST_PROJECT_KEY", "TST")
 
         args1 = {"project_key": test_project, "limit": limit, "start_at": 0}
         result1_content = await call_tool(
@@ -1314,8 +1322,8 @@ class TestRealToolValidation:
 
         test_id = str(uuid.uuid4())[:8]
 
-        # Use a dedicated TEST project for real API validation
-        test_project = "TEST"
+        # Use a dedicated test project for real API validation
+        test_project = os.environ.get("JIRA_TEST_PROJECT_KEY", "TST")
 
         issue1_args = {
             "project_key": test_project,

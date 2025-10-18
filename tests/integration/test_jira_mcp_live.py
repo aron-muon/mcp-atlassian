@@ -28,7 +28,6 @@ from tests.utils.test_setup import TestProjectSetup, fresh_test_environment
 
 
 @pytest.mark.integration
-@pytest.mark.usefixtures("fresh_test_environment")
 class TestJiraMCPFunctions(BaseAuthTest):
     """Live tests for all Jira MCP functions with real API calls."""
 
