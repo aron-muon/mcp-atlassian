@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the Jira comments functionality for the MCP Atlassian connector, providing a dedicated MCP tool to retrieve comments from Jira issues with configurable limits and automatic markdown conversion. It ensures comprehensive comment data structure handling, integration with existing comment infrastructure, proper tool categorization, and robust error handling across different Atlassian deployment types.
+
+## Requirements
 
 ### Requirement: Jira Issue Comments Retrieval Tool
 The system SHALL provide a dedicated MCP tool to retrieve comments from Jira issues with configurable limits and automatic markdown conversion.

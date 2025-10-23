@@ -1,5 +1,7 @@
-## ADDED Requirements
+## Purpose
+Provides comprehensive authentication architecture for Atlassian MCP integration, supporting multiple authentication methods across Cloud and Server/Data Center instances with automatic detection, secure session management, and robust error handling.
 
+## Requirements
 ### Requirement: Multi-Method Authentication Architecture
 The system SHALL provide a flexible authentication architecture supporting multiple Atlassian authentication methods with automatic detection and configuration.
 

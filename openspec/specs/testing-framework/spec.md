@@ -1,5 +1,7 @@
-## ADDED Requirements
+## Purpose
+Provides comprehensive testing framework for the Atlassian MCP integration, covering unit tests, integration tests, and live API testing to ensure reliability and functionality across all components.
 
+## Requirements
 ### Requirement: Comprehensive Test Suite Architecture
 The system SHALL provide a comprehensive testing framework with multiple test categories and levels.
 

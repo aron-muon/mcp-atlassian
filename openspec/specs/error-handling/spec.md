@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the comprehensive error handling architecture for the MCP Atlassian connector, providing decorator-based error handling, intelligent error classification, and standardized response formats. It ensures robust exception recovery, comprehensive logging and monitoring, and actionable user guidance while maintaining system resilience and providing consistent error experiences across all MCP tools and operations.
+
+## Requirements
 
 ### Requirement: Comprehensive Error Handling Architecture
 The system SHALL provide comprehensive error handling with decorator-based implementation and consistent error responses.

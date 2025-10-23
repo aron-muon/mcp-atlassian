@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the content processing capabilities for the MCP Atlassian connector, providing comprehensive markup conversion between different formats including Jira markup, Confluence markup, HTML, and Markdown. It ensures content structure preservation, intelligent formatting enhancement, and flexible configuration options to deliver readable and well-formatted content across all Atlassian services.
+
+## Requirements
 
 ### Requirement: Atlassian Markup Conversion
 The system SHALL provide comprehensive markup conversion between different formats.

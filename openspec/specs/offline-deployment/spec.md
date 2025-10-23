@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the comprehensive offline deployment solution for the MCP Atlassian connector, providing complete Docker-based deployment capabilities for air-gapped environments without internet connectivity. It ensures automated build and export processes, multi-transfer method support, production-ready configurations, comprehensive troubleshooting, and detailed documentation to enable reliable deployment in isolated environments.
+
+## Requirements
 
 ### Requirement: Complete Offline Docker Deployment Solution
 The system SHALL provide a comprehensive solution for building and deploying MCP Atlassian Docker images in offline environments without internet connectivity.

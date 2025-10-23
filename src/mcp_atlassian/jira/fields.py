@@ -227,26 +227,37 @@ class FieldsMixin(JiraClient, EpicOperationsProto, UsersOperationsProto):
                 )
                 return {}
 
-            # Step 2: Call the correct API method to get field metadata
-            meta = self.jira.issue_createmeta_fieldtypes(
-                project=project_key, issue_type_id=issue_type_id
-            )
+            # Step 2: Get field metadata using current API endpoints
+            # Replace deprecated createmeta with field and issue type APIs
+            all_fields = self.get_all_fields()
+
+            # Get issue type details to determine required fields
+            issue_types = self.jira.issue_types_for_project(project_key)
+            current_issue_type = None
+            for it in issue_types:
+                if it.get("id") == issue_type_id or it.get("name", "").lower() == issue_type.lower():
+                    current_issue_type = it
+                    break
 
             required_fields = {}
-            # Step 3: Parse the response and extract required fields
-            if isinstance(meta, dict) and "fields" in meta:
-                if isinstance(meta["fields"], list):
-                    for field_meta in meta["fields"]:
-                        if isinstance(field_meta, dict) and field_meta.get(
-                            "required", False
-                        ):
-                            field_id = field_meta.get("fieldId")
-                            if field_id:
-                                required_fields[field_id] = field_meta
-                else:
-                    logger.warning(
-                        "Unexpected format for 'fields' in createmeta response."
-                    )
+            if current_issue_type and "fields" in current_issue_type:
+                # Use the issue type's field requirements if available
+                for field_id, field_config in current_issue_type["fields"].items():
+                    if field_config.get("required", False):
+                        # Find full field definition from all_fields
+                        field_def = next((f for f in all_fields if f.get("id") == field_id), {})
+                        if field_def:
+                            required_fields[field_id] = field_def
+            else:
+                # Fallback: check common required fields and validate against available fields
+                common_required = ["summary", "issuetype"]
+                if current_issue_type and current_issue_type.get("subtask", False):
+                    common_required.append("parent")
+
+                for field_id in common_required:
+                    field_def = next((f for f in all_fields if f.get("id") == field_id), {})
+                    if field_def:
+                        required_fields[field_id] = {"fieldId": field_id, "name": field_def.get("name", field_id), "required": True}
 
             if not required_fields:
                 logger.warning(
@@ -426,6 +437,57 @@ class FieldsMixin(JiraClient, EpicOperationsProto, UsersOperationsProto):
         """
         return field_id.startswith("customfield_")
 
+    def validate_priority_field(self, priority_value: str | dict) -> dict[str, Any]:
+        """
+        Validate and format priority field values to use correct ID format.
+
+        Args:
+            priority_value: Priority value (can be name like "High" or dict with id)
+
+        Returns:
+            Properly formatted priority field with ID
+        """
+        try:
+            # If already in correct format, return as-is
+            if isinstance(priority_value, dict) and "id" in priority_value:
+                return priority_value
+
+            # Get available priorities
+            priorities = self.jira.priorities()
+
+            if not priorities:
+                logger.warning("Could not fetch priorities from Jira API")
+                return priority_value
+
+            # Search by name if value is string
+            if isinstance(priority_value, str):
+                for priority in priorities:
+                    if priority.get("name", "").lower() == priority_value.lower():
+                        return {"id": priority["id"], "name": priority["name"]}
+
+                # If not found by name, try to match by ID string
+                for priority in priorities:
+                    if str(priority.get("id", "")) == priority_value:
+                        return {"id": priority["id"], "name": priority["name"]}
+
+                logger.warning(f"Priority '{priority_value}' not found. Available priorities: {[p.get('name') for p in priorities]}")
+                return priority_value
+
+            # If it's a dict but missing id, try to find by name
+            if isinstance(priority_value, dict):
+                if "name" in priority_value:
+                    for priority in priorities:
+                        if priority.get("name", "").lower() == str(priority_value["name"]).lower():
+                            return {"id": priority["id"], "name": priority["name"]}
+
+            # Fallback: return original value
+            logger.warning(f"Could not validate priority field: {priority_value}")
+            return priority_value
+
+        except Exception as e:
+            logger.error(f"Error validating priority field: {str(e)}")
+            return priority_value
+
     def format_field_value(self, field_id: str, value: Any) -> Any:
         """
         Format a field value based on its type for update operations.
@@ -474,6 +536,10 @@ class FieldsMixin(JiraClient, EpicOperationsProto, UsersOperationsProto):
                 if isinstance(value, str):
                     return {"value": value}
                 return value
+
+            elif field_type == "priority":
+                # Handle priority fields - use correct ID format
+                return self.validate_priority_field(value)
 
             # For other types, return as-is
             return value

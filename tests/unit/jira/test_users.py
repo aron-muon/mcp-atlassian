@@ -625,3 +625,164 @@ class TestUsersMixin:
             Exception, match="Error processing user profile for 'error_user'"
         ):
             users_mixin.get_user_profile_by_identifier("error_user")
+
+    def test_search_users_cloud(self, users_mixin):
+        """Test search_users for Jira Cloud."""
+        # Mock config for Cloud
+        users_mixin.config = MagicMock(spec=JiraConfig)
+        users_mixin.config.is_cloud = True
+
+        # Mock the Jira user_search response
+        mock_users = [
+            {
+                "accountId": "account123",
+                "displayName": "John Doe",
+                "emailAddress": "john.doe@example.com",
+                "name": "johndoe"
+            },
+            {
+                "accountId": "account456",
+                "displayName": "Jane Smith",
+                "emailAddress": "jane.smith@example.com",
+                "name": "janesmith"
+            }
+        ]
+        users_mixin.jira.user_search = MagicMock(return_value=mock_users)
+
+        # Call the method
+        result = users_mixin.search_users("john", max_results=10)
+
+        # Verify the results
+        assert len(result) == 2
+        assert result[0]["displayName"] == "John Doe"
+        assert result[1]["displayName"] == "Jane Smith"
+        users_mixin.jira.user_search.assert_called_once_with("john", 10)
+
+    def test_search_users_server_dc(self, users_mixin):
+        """Test search_users for Jira Server/DC."""
+        # Mock config for Server/DC
+        users_mixin.config = MagicMock(spec=JiraConfig)
+        users_mixin.config.is_cloud = False
+
+        # Mock the Jira user_search response
+        mock_users = [
+            {
+                "name": "johndoe",
+                "displayName": "John Doe",
+                "emailAddress": "john.doe@example.com",
+                "active": True
+            }
+        ]
+        users_mixin.jira.user_search = MagicMock(return_value=mock_users)
+
+        # Call the method
+        result = users_mixin.search_users("john", max_results=5)
+
+        # Verify the results
+        assert len(result) == 1
+        assert result[0]["displayName"] == "John Doe"
+        users_mixin.jira.user_search.assert_called_once_with(
+            username="john",
+            includeActive=True,
+            includeInactive=False,
+            maxResults=5
+        )
+
+    def test_search_users_error(self, users_mixin):
+        """Test search_users handles API errors gracefully."""
+        # Mock API error
+        users_mixin.jira.user_search = MagicMock(side_effect=Exception("API Error"))
+
+        # Call the method
+        result = users_mixin.search_users("john")
+
+        # Verify empty list is returned
+        assert result == []
+
+    def test_search_users_invalid_response(self, users_mixin):
+        """Test search_users handles invalid response format."""
+        # Mock invalid response
+        users_mixin.jira.user_search = MagicMock(return_value="invalid response")
+
+        # Call the method
+        result = users_mixin.search_users("john")
+
+        # Verify empty list is returned
+        assert result == []
+
+    def test_find_user_for_assignment_exact_match(self, users_mixin):
+        """Test find_user_for_assignment with exact match."""
+        # Mock the search_users response
+        mock_users = [
+            {
+                "accountId": "account123",
+                "displayName": "John Doe",
+                "emailAddress": "john.doe@example.com",
+                "name": "johndoe"
+            },
+            {
+                "accountId": "account456",
+                "displayName": "Jane Smith",
+                "emailAddress": "jane.smith@example.com",
+                "name": "janesmith"
+            }
+        ]
+        users_mixin.search_users = MagicMock(return_value=mock_users)
+
+        # Test exact match by display name
+        result = users_mixin.find_user_for_assignment("John Doe")
+        assert result is not None
+        assert result["displayName"] == "John Doe"
+        assert result["accountId"] == "account123"
+
+        # Test exact match by email
+        result = users_mixin.find_user_for_assignment("jane.smith@example.com")
+        assert result is not None
+        assert result["displayName"] == "Jane Smith"
+        assert result["accountId"] == "account456"
+
+        # Test exact match by username
+        result = users_mixin.find_user_for_assignment("johndoe")
+        assert result is not None
+        assert result["displayName"] == "John Doe"
+        assert result["accountId"] == "account123"
+
+    def test_find_user_for_assignment_no_exact_match(self, users_mixin):
+        """Test find_user_for_assignment with no exact match."""
+        # Mock the search_users response
+        mock_users = [
+            {
+                "accountId": "account123",
+                "displayName": "John Doe",
+                "emailAddress": "john.doe@example.com",
+                "name": "johndoe"
+            }
+        ]
+        users_mixin.search_users = MagicMock(return_value=mock_users)
+
+        # Test with no exact match
+        result = users_mixin.find_user_for_assignment("NonExistentUser")
+        assert result is not None
+        assert result["displayName"] == "John Doe"  # Should return first result
+
+    def test_find_user_for_assignment_no_users_found(self, users_mixin):
+        """Test find_user_for_assignment when no users are found."""
+        # Mock empty search response
+        users_mixin.search_users = MagicMock(return_value=[])
+
+        # Call the method
+        result = users_mixin.find_user_for_assignment("NonExistentUser")
+
+        # Verify None is returned
+        assert result is None
+
+    def test_find_user_for_assignment_search_error(self, users_mixin):
+        """Test find_user_for_assignment handles search errors gracefully."""
+        # Mock search error
+        users_mixin.search_users = MagicMock(side_effect=Exception("Search Error"))
+
+        # Call the method
+        result = users_mixin.find_user_for_assignment("john")
+
+        # Verify None is returned
+        assert result is None

@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the development workflow and standards for the MCP Atlassian connector project, providing comprehensive guidelines for autonomous coding agents and developers. It establishes repository structure understanding, development environment setup using uv package manager, MCP architecture patterns, code style conventions, testing strategies, and quality standards to ensure consistent, high-quality contributions across the project.
+
+## Requirements
 
 ### Requirement: Repository Structure Understanding
 The system SHALL provide a clear repository map for autonomous coding agents to understand the project structure.

@@ -1,4 +1,8 @@
-## MODIFIED Requirements
+## Purpose
+
+This specification defines the comprehensive authentication system for the MCP Atlassian connector, supporting multiple authentication methods across different Atlassian instance types. It provides automatic detection of instance types, configuration of appropriate authentication methods, and robust error handling to ensure secure and reliable connections to both Atlassian Cloud and Server/Data Center instances.
+
+## Requirements
 
 ### Requirement: Multi-Method Authentication Support
 The system SHALL support multiple authentication methods with automatic detection and proper configuration for different Atlassian instance types.

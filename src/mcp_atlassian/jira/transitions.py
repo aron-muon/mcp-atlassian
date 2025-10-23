@@ -416,3 +416,163 @@ class TransitionsMixin(JiraClient, IssueOperationsProto, UsersOperationsProto):
         transition_data["update"] = {
             "comment": [{"add": {"body": jira_formatted_comment}}]
         }
+
+    def get_transition_metadata(self, issue_key: str) -> dict[str, Any]:
+        """
+        Get comprehensive transition metadata for an issue including available transitions,
+        required fields, and conditions.
+
+        Args:
+            issue_key: The issue key
+
+        Returns:
+            Dictionary containing comprehensive transition metadata
+        """
+        try:
+            # Get current issue details
+            issue = self.get_issue(issue_key)
+            if not issue:
+                logger.error(f"Issue '{issue_key}' not found")
+                return {}
+
+            # Get available transitions
+            transitions = self.get_available_transitions(issue_key)
+
+            # Get all fields to understand what might be required
+            all_fields = self.get_all_fields()
+
+            # Get project information for context
+            project_key = issue.key.split("-")[0]
+            project_metadata = self.get_project_metadata(project_key)
+
+            transition_metadata = []
+            for transition in transitions:
+                transition_id = transition.get("id")
+                transition_name = transition.get("name")
+                to_status = transition.get("to", {})
+
+                # Get required fields for this transition (if available)
+                required_fields = []
+                try:
+                    # Try to get transition details including required fields
+                    transition_details = self._get_transition_details(issue_key, transition_id)
+                    required_fields = transition_details.get("fields", {}).keys()
+                except Exception as e:
+                    logger.debug(f"Could not get transition details for {transition_id}: {str(e)}")
+
+                # Find field definitions for required fields
+                field_definitions = []
+                for field_id in required_fields:
+                    field_def = next((f for f in all_fields if f.get("id") == field_id), {})
+                    if field_def:
+                        field_definitions.append(field_def)
+
+                transition_metadata.append({
+                    "id": transition_id,
+                    "name": transition_name,
+                    "to_status": to_status,
+                    "required_fields": field_definitions,
+                    "screen": transition_details.get("screen", {}) if 'transition_details' in locals() else {}
+                })
+
+            metadata = {
+                "issue": {
+                    "key": issue.key,
+                    "status": issue.status.name if issue.status else None,
+                    "issue_type": issue.issuetype.name if issue.issuetype else None,
+                    "project_key": project_key
+                },
+                "available_transitions": transition_metadata,
+                "project_fields": all_fields,
+                "project_metadata": project_metadata
+            }
+
+            return metadata
+
+        except Exception as e:
+            logger.error(f"Error getting transition metadata for '{issue_key}': {str(e)}")
+            return {}
+
+    def _get_transition_details(self, issue_key: str, transition_id: str) -> dict[str, Any]:
+        """
+        Get detailed information about a specific transition including required fields.
+
+        Args:
+            issue_key: The issue key
+            transition_id: The transition ID
+
+        Returns:
+            Dictionary containing transition details
+        """
+        try:
+            # Use the Jira API to get transition details
+            base_url = self.jira.resource_url("issue")
+            url = f"{base_url}/{issue_key}/transitions"
+
+            # Get all transitions with details
+            response = self.jira.get(url, params={"transitionId": transition_id, "expand": "transitions.fields"})
+
+            if isinstance(response, dict) and "transitions" in response:
+                transitions = response["transitions"]
+                for transition in transitions:
+                    if str(transition.get("id")) == str(transition_id):
+                        return transition
+
+            return {}
+
+        except Exception as e:
+            logger.debug(f"Could not get transition details for {transition_id}: {str(e)}")
+            return {}
+
+    def validate_transition_fields(self, issue_key: str, transition_id: str, fields: dict[str, Any]) -> dict[str, Any]:
+        """
+        Validate that required fields are present and properly formatted for a transition.
+
+        Args:
+            issue_key: The issue key
+            transition_id: The transition ID
+            fields: Fields to validate
+
+        Returns:
+            Dictionary with validation results and any formatted field values
+        """
+        try:
+            transition_details = self._get_transition_details(issue_key, transition_id)
+            required_fields = transition_details.get("fields", {})
+
+            validation_result = {
+                "valid": True,
+                "missing_fields": [],
+                "invalid_fields": [],
+                "formatted_fields": {}
+            }
+
+            # Check each required field
+            for field_id, field_config in required_fields.items():
+                if field_config.get("required", False):
+                    if field_id not in fields:
+                        validation_result["missing_fields"].append(field_id)
+                        validation_result["valid"] = False
+                    else:
+                        # Format the field value
+                        try:
+                            formatted_value = self.format_field_value(field_id, fields[field_id])
+                            validation_result["formatted_fields"][field_id] = formatted_value
+                        except Exception as e:
+                            validation_result["invalid_fields"].append({
+                                "field": field_id,
+                                "error": str(e)
+                            })
+                            validation_result["valid"] = False
+
+            return validation_result
+
+        except Exception as e:
+            logger.error(f"Error validating transition fields: {str(e)}")
+            return {
+                "valid": False,
+                "error": str(e),
+                "missing_fields": [],
+                "invalid_fields": [],
+                "formatted_fields": {}
+            }

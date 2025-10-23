@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the comprehensive MCP server architecture for the Atlassian connector using FastMCP framework, providing robust server implementation, tool registration and management, seamless client integration, and flexible deployment capabilities. It ensures optimal performance, scalability, security, and compliance while supporting various MCP clients and deployment environments with comprehensive configuration and monitoring capabilities.
+
+## Requirements
 
 ### Requirement: FastMCP Server Implementation
 The system SHALL provide comprehensive FastMCP server implementation for Atlassian integration.

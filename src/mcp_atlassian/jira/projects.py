@@ -250,18 +250,13 @@ class ProjectsMixin(JiraClient, SearchOperationsProto):
             List of issue type data dictionaries
         """
         try:
-            meta = self.jira.issue_createmeta_issuetypes(project=project_key)
-            if not isinstance(meta, dict):
-                msg = f"Unexpected return value type from `jira.issue_createmeta_issuetypes`: {type(meta)}"
+            # Replace deprecated createmeta endpoint with current API
+            issue_types = self.jira.issue_types_for_project(project_key)
+
+            if not isinstance(issue_types, list):
+                msg = f"Unexpected return value type from `jira.issue_types_for_project`: {type(issue_types)}"
                 logger.error(msg)
                 raise TypeError(msg)
-
-            issue_types = []
-            # Extract issue types from createmeta response
-            if "projects" in meta and len(meta["projects"]) > 0:
-                project_data = meta["projects"][0]
-                if "issuetypes" in project_data:
-                    issue_types = project_data["issuetypes"]
 
             return issue_types
 
@@ -462,3 +457,129 @@ class ProjectsMixin(JiraClient, SearchOperationsProto):
             release_date=release_date,
             description=description,
         )
+
+    def get_project_metadata(self, project_key: str) -> dict[str, Any]:
+        """
+        Get comprehensive metadata for a project including fields, issue types, and configurations.
+
+        Args:
+            project_key: The project key
+
+        Returns:
+            Dictionary containing comprehensive project metadata
+        """
+        try:
+            # Get basic project information
+            project = self.get_project(project_key)
+            if not project:
+                logger.error(f"Project '{project_key}' not found")
+                return {}
+
+            # Get issue types for the project
+            issue_types = self.get_project_issue_types(project_key)
+
+            # Get all available fields
+            all_fields = self.get_all_fields()
+
+            # Get project components
+            try:
+                components = self.jira.project_components(project_key)
+            except Exception as e:
+                logger.warning(f"Could not get project components: {str(e)}")
+                components = []
+
+            # Get project versions
+            try:
+                versions = self.jira.project_versions(project_key)
+            except Exception as e:
+                logger.warning(f"Could not get project versions: {str(e)}")
+                versions = []
+
+            # Get project boards (if available)
+            boards = []
+            try:
+                if hasattr(self.jira, 'boards'):
+                    boards_data = self.jira.boards(project_key or project_key)
+                    if isinstance(boards_data, dict) and 'values' in boards_data:
+                        boards = boards_data['values']
+                    elif isinstance(boards_data, list):
+                        boards = boards_data
+            except Exception as e:
+                logger.debug(f"Could not get project boards: {str(e)}")
+
+            metadata = {
+                "project": project,
+                "issue_types": issue_types,
+                "fields": all_fields,
+                "components": components,
+                "versions": versions,
+                "boards": boards,
+                "field_mappings": self._get_field_mappings(all_fields),
+                "required_fields_by_type": self._get_required_fields_by_type(issue_types, all_fields)
+            }
+
+            return metadata
+
+        except Exception as e:
+            logger.error(f"Error getting project metadata for '{project_key}': {str(e)}")
+            return {}
+
+    def _get_field_mappings(self, fields: list[dict]) -> dict[str, str]:
+        """
+        Create a mapping of field names to field IDs.
+
+        Args:
+            fields: List of field definitions
+
+        Returns:
+            Dictionary mapping field names to field IDs
+        """
+        mappings = {}
+        for field in fields:
+            field_id = field.get("id", "")
+            field_name = field.get("name", "")
+            if field_id and field_name:
+                mappings[field_name.lower()] = field_id
+                # Also add some common variations
+                if " " in field_name:
+                    mappings[field_name.replace(" ", "").lower()] = field_id
+                    mappings[field_name.replace(" ", "_").lower()] = field_id
+        return mappings
+
+    def _get_required_fields_by_type(self, issue_types: list[dict], fields: list[dict]) -> dict[str, list[str]]:
+        """
+        Get required fields for each issue type.
+
+        Args:
+            issue_types: List of issue type definitions
+            fields: List of field definitions
+
+        Returns:
+            Dictionary mapping issue type names to lists of required field IDs
+        """
+        required_by_type = {}
+        field_map = {f.get("id"): f for f in fields}
+
+        for issue_type in issue_types:
+            issue_type_name = issue_type.get("name", "")
+            required_fields = []
+
+            # Check if issue type has required fields defined
+            if "fields" in issue_type:
+                for field_id, field_config in issue_type["fields"].items():
+                    if field_config.get("required", False):
+                        required_fields.append(field_id)
+
+            # Fallback to common required fields
+            if not required_fields:
+                common_required = ["summary", "issuetype"]
+                if issue_type.get("subtask", False):
+                    common_required.append("parent")
+
+                for field_id in common_required:
+                    if field_id in field_map:
+                        required_fields.append(field_id)
+
+            required_by_type[issue_type_name] = required_fields
+
+        return required_by_type

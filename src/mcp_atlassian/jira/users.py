@@ -2,7 +2,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, TypeVar, Any
 
 import requests
 from requests.exceptions import HTTPError
@@ -359,3 +359,73 @@ class UsersMixin(JiraClient):
             raise Exception(
                 f"Error processing user profile for '{identifier}': {str(e)}"
             ) from e
+
+    def search_users(self, query: str, max_results: int = 50) -> list[dict[str, Any]]:
+        """
+        Search for users in Jira using the /rest/api/3/user/search endpoint.
+
+        Args:
+            query: Search query (can be username, display name, or email)
+            max_results: Maximum number of results to return (default: 50)
+
+        Returns:
+            List of user dictionaries with user information
+        """
+        try:
+            if self.config.is_cloud:
+                # Use Cloud API endpoint
+                users = self.jira.user_search(query, max_results)
+            else:
+                # Use Server/DC API endpoint
+                users = self.jira.user_search(
+                    username=query,
+                    includeActive=True,
+                    includeInactive=False,
+                    maxResults=max_results
+                )
+
+            if not isinstance(users, list):
+                logger.warning(f"Unexpected user search result format: {type(users)}")
+                return []
+
+            logger.debug(f"Found {len(users)} users matching query '{query}'")
+            return users
+
+        except Exception as e:
+            logger.error(f"Error searching users with query '{query}': {str(e)}")
+            return []
+
+    def find_user_for_assignment(self, identifier: str) -> dict[str, Any] | None:
+        """
+        Find a user suitable for issue assignment.
+
+        Args:
+            identifier: User identifier (username, email, display name)
+
+        Returns:
+            User dictionary with appropriate fields for assignment, or None if not found
+        """
+        try:
+            # First try exact search
+            users = self.search_users(identifier, max_results=10)
+
+            if not users:
+                logger.warning(f"No users found matching '{identifier}'")
+                return None
+
+            # Look for exact matches first
+            for user in users:
+                if (
+                    user.get("displayName", "").lower() == identifier.lower()
+                    or user.get("emailAddress", "").lower() == identifier.lower()
+                    or user.get("name", "").lower() == identifier.lower()
+                ):
+                    return user
+
+            # If no exact match, return the first result
+            logger.info(f"No exact match found for '{identifier}', returning first result")
+            return users[0]
+
+        except Exception as e:
+            logger.error(f"Error finding user for assignment '{identifier}': {str(e)}")
+            return None

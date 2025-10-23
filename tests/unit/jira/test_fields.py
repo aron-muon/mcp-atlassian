@@ -540,3 +540,93 @@ class TestFieldsMixin:
 
         # Verify empty list is returned on error
         assert result == []
+
+    def test_validate_priority_field_with_string(self, fields_mixin: FieldsMixin):
+        """Test validate_priority_field with string input."""
+        # Mock the Jira priorities response
+        mock_priorities = [
+            {"id": "1", "name": "Highest"},
+            {"id": "2", "name": "High"},
+            {"id": "3", "name": "Medium"},
+            {"id": "4", "name": "Low"},
+            {"id": "5", "name": "Lowest"}
+        ]
+        fields_mixin.jira.priorities = MagicMock(return_value=mock_priorities)
+
+        # Test with priority name
+        result = fields_mixin.validate_priority_field("High")
+        expected = {"id": "2", "name": "High"}
+        assert result == expected
+
+        # Test case insensitive
+        result = fields_mixin.validate_priority_field("medium")
+        expected = {"id": "3", "name": "Medium"}
+        assert result == expected
+
+        # Test with priority ID as string
+        result = fields_mixin.validate_priority_field("1")
+        expected = {"id": "1", "name": "Highest"}
+        assert result == expected
+
+    def test_validate_priority_field_with_dict(self, fields_mixin: FieldsMixin):
+        """Test validate_priority_field with dict input."""
+        # Mock the Jira priorities response
+        mock_priorities = [
+            {"id": "1", "name": "Highest"},
+            {"id": "2", "name": "High"}
+        ]
+        fields_mixin.jira.priorities = MagicMock(return_value=mock_priorities)
+
+        # Test with already formatted dict
+        already_formatted = {"id": "2", "name": "High"}
+        result = fields_mixin.validate_priority_field(already_formatted)
+        assert result == already_formatted
+
+        # Test with dict missing ID
+        dict_without_id = {"name": "High"}
+        result = fields_mixin.validate_priority_field(dict_without_id)
+        expected = {"id": "2", "name": "High"}
+        assert result == expected
+
+    def test_validate_priority_field_not_found(self, fields_mixin: FieldsMixin):
+        """Test validate_priority_field with non-existent priority."""
+        # Mock the Jira priorities response
+        mock_priorities = [
+            {"id": "1", "name": "Highest"},
+            {"id": "2", "name": "High"}
+        ]
+        fields_mixin.jira.priorities = MagicMock(return_value=mock_priorities)
+
+        # Test with non-existent priority
+        result = fields_mixin.validate_priority_field("NonExistent")
+        assert result == "NonExistent"  # Should return original value
+
+    def test_validate_priority_field_api_error(self, fields_mixin: FieldsMixin):
+        """Test validate_priority_field handles API errors gracefully."""
+        # Mock API error
+        fields_mixin.jira.priorities = MagicMock(side_effect=Exception("API Error"))
+
+        # Test with any input
+        result = fields_mixin.validate_priority_field("High")
+        assert result == "High"  # Should return original value
+
+    def test_format_field_value_priority_field(self, fields_mixin: FieldsMixin):
+        """Test format_field_value handles priority fields correctly."""
+        # Mock the field and priority validation
+        mock_priority_field = {
+            "id": "priority",
+            "name": "Priority",
+            "schema": {"type": "priority"},
+        }
+        fields_mixin.get_field_by_id = MagicMock(return_value=mock_priority_field)
+
+        mock_priorities = [
+            {"id": "2", "name": "High"},
+            {"id": "3", "name": "Medium"}
+        ]
+        fields_mixin.validate_priority_field = MagicMock(return_value={"id": "2", "name": "High"})
+
+        # Test with string priority name
+        result = fields_mixin.format_field_value("priority", "High")
+        expected = {"id": "2", "name": "High"}
+        assert result == expected

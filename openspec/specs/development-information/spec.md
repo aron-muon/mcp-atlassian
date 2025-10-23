@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the development information integration capabilities for the MCP Atlassian connector, providing comprehensive retrieval and analysis of development data from Jira issues through Atlassian's development integration APIs. It aggregates pull requests, branches, commits, builds, and repository information from multiple providers (Bitbucket, GitHub, GitLab) while normalizing data across different platforms and ensuring robust error handling.
+
+## Requirements
 
 ### Requirement: Development Information Integration
 The system SHALL provide comprehensive development information retrieval from Jira issues through Atlassian's development integration APIs.

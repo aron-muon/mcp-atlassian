@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the comprehensive live testing framework for the MCP Atlassian connector, providing complete validation of MCP functionality against real Atlassian instances with automatic resource management. It ensures test environment isolation, real data validation, multiple execution modes, robust error handling, performance monitoring, and comprehensive safety measures to prevent damage to production systems while providing thorough testing coverage.
+
+## Requirements
 
 ### Requirement: Comprehensive Live API Testing Framework
 The system SHALL provide a comprehensive testing framework that validates MCP functionality against real Atlassian instances with automatic resource management.

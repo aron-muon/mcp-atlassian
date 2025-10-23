@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the comprehensive data model architecture for the MCP Atlassian connector using Pydantic-based models to handle API responses and entity relationships. It provides robust data validation, serialization, error handling, and performance optimization while ensuring security and extensibility for complex data structures across Jira and Confluence services.
+
+## Requirements
 
 ### Requirement: Pydantic Data Model Architecture
 The system SHALL provide comprehensive Pydantic-based data models for API response handling.

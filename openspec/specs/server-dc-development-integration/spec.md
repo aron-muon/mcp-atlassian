@@ -1,4 +1,8 @@
-## MODIFIED Requirements
+## Purpose
+
+This specification defines the comprehensive Server/Data Center development information integration capabilities for the MCP Atlassian connector, handling API compatibility differences between Cloud and Server/DC instances. It provides automatic issue key to ID conversion, graceful handling of Server/DC limitations, robust error handling, authentication integration, fallback mechanisms, and comprehensive troubleshooting support for development panel integrations.
+
+## Requirements
 
 ### Requirement: Server/Data Center Development Information API Compatibility
 The system SHALL handle differences between Cloud and Server/Data Center development information APIs with automatic adaptation.

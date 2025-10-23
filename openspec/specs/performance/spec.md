@@ -1,4 +1,8 @@
-## ADDED Requirements
+## Purpose
+
+This specification defines the comprehensive performance optimization framework for the MCP Atlassian connector, providing rate limiting, bulk operations optimization, intelligent caching strategies, and performance monitoring capabilities. It ensures efficient API usage, scalable bulk processing, comprehensive analytics, and robust performance testing to deliver optimal performance across all Atlassian service integrations.
+
+## Requirements
 
 ### Requirement: Rate Limiting and API Throttling
 The system SHALL provide comprehensive rate limiting to ensure respectful API usage.
