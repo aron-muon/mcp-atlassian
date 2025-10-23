@@ -8,6 +8,71 @@
 
 Model Context Protocol (MCP) server for Atlassian products (Confluence and Jira). This integration supports both Confluence & Jira Cloud and Server/Data Center deployments.
 
+## 🚀 Fork-Specific Enhancements
+
+This is an **enhanced fork** of [sooperset/mcp-atlassian](https://github.com/sooperset/mcp-atlassian) with significant improvements and new capabilities:
+
+### ✨ Major New Features
+
+- **📋 OpenSpec-Driven Development** - Comprehensive specification system for structured change management and proposal-driven development workflow
+- **🔧 Enhanced Testing Infrastructure** - Robust test environment management with real API testing capabilities and comprehensive test coverage
+- **🛠️ Development Tooling Suite** - Extensive collection of scripts for OAuth setup, authentication testing, and live data validation
+- **📊 Improved Error Handling** - Advanced error diagnostics, retry mechanisms, and detailed logging throughout the application
+- **🏗️ Organized Project Structure** - Reorganized directory structure with dedicated spaces for development tools and specifications
+
+### 🔍 What's Different from Upstream
+
+| Feature | Upstream | This Fork |
+|---------|----------|-----------|
+| **Change Management** | Ad-hoc commits | OpenSpec proposals with structured validation |
+| **Testing** | Basic unit tests | Comprehensive test suite with real API integration |
+| **Development Tools** | Minimal setup | Complete tooling ecosystem for OAuth, auth testing, and validation |
+| **Error Handling** | Basic error responses | Advanced retry mechanisms with detailed diagnostics |
+| **Documentation** | Standard README | Enhanced docs with development guides and specifications |
+| **Project Organization** | Flat structure | Organized hierarchy with dedicated development directories |
+
+### 🎯 Development Focus
+
+This fork emphasizes:
+- **Developer Experience**: Comprehensive tooling for easier development and testing
+- **Reliability**: Enhanced error handling and retry mechanisms
+- **Maintainability**: Structured change management through OpenSpec
+- **Testing**: Real-world API testing capabilities
+- **Documentation**: Complete development guides and specifications
+
+### 🛠️ Fork-Specific Development Tools
+
+This fork includes extensive development tooling not found in upstream:
+
+#### Scripts Directory (`/scripts/`)
+- **`oauth_authorize.py`** - Complete OAuth authorization flow testing
+- **`test_with_real_data.sh`** - Real API testing against live Atlassian instances
+- **`test_auth_setup.py`** - Authentication method validation
+- **`test_simple_auth.py`** - Basic authentication testing
+- **`find_test_issues.py`** - Test data discovery and management
+- **Docker utilities** - Build, save, and load scripts for development workflow
+
+#### OpenSpec System (`/openspec/`)
+- **Structured change proposals** with validation workflows
+- **Comprehensive specifications** for all capabilities
+- **Development guidelines** and contribution standards
+- **Change management** with approval workflows
+
+### 📁 Enhanced Directory Structure
+
+```
+mcp-atlassian/
+├── openspec/                    # 🆕 Specification system
+│   ├── AGENTS.md               # AI development guidelines
+│   ├── specs/                  # Current capabilities documentation
+│   └── changes/                # Proposed changes with validation
+├── scripts/                     # 🆕 Development tools
+│   ├── oauth_authorize.py      # OAuth testing utilities
+│   ├── test_with_real_data.sh  # Live API testing
+│   └── docker-*.sh            # Development Docker workflow
+└── src/mcp_atlassian/          # Enhanced with improved error handling
+```
+
 ## Example Usage
 
 Ask your AI assistant to:
@@ -914,12 +979,28 @@ type %APPDATA%\Claude\logs\mcp*.log | more
 
 ## Contributing
 
+This fork follows a structured development process using OpenSpec for change management.
+
+### 📋 Fork-Specific Contribution Process
+
+1. **Read Development Guidelines**: Check [`openspec/AGENTS.md`](openspec/AGENTS.md) for comprehensive development instructions
+2. **Create OpenSpec Proposal**: For new features or breaking changes, create structured proposals in `/openspec/changes/`
+3. **Use Development Tools**: Leverage scripts in `/scripts/` for testing and validation
+4. **Real API Testing**: Use the comprehensive test suite including live API testing capabilities
+
+### Standard Process
+
 We welcome contributions to MCP Atlassian! If you'd like to contribute:
 
 1. Check out our [CONTRIBUTING.md](CONTRIBUTING.md) guide for detailed development setup instructions.
-2. Make changes and submit a pull request.
+2. **For this fork**: Review [`openspec/AGENTS.md`](openspec/AGENTS.md) for the structured development workflow
+3. Make changes and submit a pull request.
 
 We use pre-commit hooks for code quality and follow semantic versioning for releases.
+
+### 🔄 Upstream Relationship
+
+This fork aims to maintain compatibility with upstream [sooperset/mcp-atlassian](https://github.com/sooperset/mcp-atlassian) while adding enhanced development capabilities. Major improvements may be contributed back to upstream where appropriate.
 
 ## License
 
