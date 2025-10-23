@@ -29,12 +29,7 @@ class CommentsMixin(JiraClient):
             Exception: If there is an error getting comments
         """
         try:
-            # Pass order parameter to underlying API call
-            api_params = {"issueKey": issue_key}
-            if order is not None:
-                api_params["order"] = order
-
-            comments = self.jira.issue_get_comments(**api_params)
+            comments = self.jira.issue_get_comments(issue_key)
 
             if not isinstance(comments, dict):
                 msg = f"Unexpected return value type from `jira.issue_get_comments`: {type(comments)}"

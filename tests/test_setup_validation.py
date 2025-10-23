@@ -4,6 +4,7 @@ Test script to validate the automated test setup functionality.
 """
 
 import asyncio
+import pytest
 import os
 import sys
 
@@ -13,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from tests.utils.test_setup import setup_test_environment, TestProjectSetup
 
 
+@pytest.mark.anyio
 async def test_setup():
     """Test the automated test setup."""
     print("🚀 Starting automated test setup validation...")

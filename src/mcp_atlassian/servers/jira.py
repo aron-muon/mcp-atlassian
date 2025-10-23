@@ -631,13 +631,13 @@ def register_jira_tools(jira_mcp: FastMCP) -> None:
             Field(
                 description="The key of the issue to delete comment from (e.g., 'PROJ-123').",
             ),
-        ],
+        ] = "",
         comment_id: Annotated[
             str,
             Field(
                 description="The ID of the comment to delete (e.g., '12345').",
             ),
-        ],
+        ] = "",
     ) -> str:
         """
         Delete a specific comment from a Jira issue.

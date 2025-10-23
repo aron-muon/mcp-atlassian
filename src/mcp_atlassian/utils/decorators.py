@@ -353,9 +353,8 @@ def handle_tool_errors(
 
                 error_details = {
                     "success": False,
-                    "error": "Validation Error",
+                    "error": str(val_err),
                     "error_type": "validation",
-                    "message": str(val_err),
                     "correlation_id": correlation_id,
                     "service": service_name,
                     "tool": func.__name__,

@@ -252,6 +252,7 @@ class TestRealJiraValidation:
     2. The required Jira environment variables are not set
     """
 
+    @pytest.mark.anyio
     async def test_get_issue(self, use_real_jira_data, api_validation_client):
         """Test that get_issue returns a proper JiraIssue model."""
         if not use_real_jira_data:
@@ -297,6 +298,7 @@ class TestRealJiraValidation:
             # Error case - skip test if issue doesn't exist
             pytest.skip(f"Issue {issue_key} not found or access denied: {issue_data.get('error', 'Unknown error')}")
 
+    @pytest.mark.anyio
     async def test_search_issues(self, use_real_jira_data, api_validation_client):
         """Test that search_issues returns JiraIssue models."""
         if not use_real_jira_data:
@@ -329,6 +331,7 @@ class TestRealJiraValidation:
         else:
             pytest.skip(f"Search failed: {search_data.get('error', 'Unknown error')}")
 
+    @pytest.mark.anyio
     async def test_get_issue_comments(self, use_real_jira_data, api_validation_client):
         """Test that issue comments are properly converted to JiraComment models."""
         if not use_real_jira_data:
@@ -437,6 +440,7 @@ class TestRealConfluenceValidation:
             assert page.title is not None
 
 
+@pytest.mark.anyio
 async def test_jira_get_issue(jira_client: JiraFetcher, test_issue_key: str) -> None:
     """Test retrieving an issue from Jira."""
     issue = jira_client.get_issue(test_issue_key)
@@ -446,6 +450,7 @@ async def test_jira_get_issue(jira_client: JiraFetcher, test_issue_key: str) -> 
     assert hasattr(issue, "fields") or hasattr(issue, "summary")
 
 
+@pytest.mark.anyio
 async def test_jira_get_issue_with_fields(
     jira_client: JiraFetcher, test_issue_key: str
 ) -> None:
@@ -493,6 +498,7 @@ async def test_jira_get_issue_with_fields(
         assert "status" in list_data
 
 
+@pytest.mark.anyio
 async def test_jira_get_epic_issues(
     jira_client: JiraFetcher, test_epic_key: str
 ) -> None:
@@ -507,6 +513,7 @@ async def test_jira_get_epic_issues(
             assert hasattr(issue, "id")
 
 
+@pytest.mark.anyio
 async def test_confluence_get_page_content(
     confluence_client: ConfluenceFetcher, test_page_id: str
 ) -> None:
@@ -518,6 +525,7 @@ async def test_confluence_get_page_content(
     assert page.title is not None
 
 
+@pytest.mark.anyio
 async def test_jira_create_issue(
     jira_client: JiraFetcher,
     test_project_key: str,
@@ -668,6 +676,7 @@ async def test_jira_create_task_with_parent(
         cleanup_resources()
 
 
+@pytest.mark.anyio
 async def test_jira_create_epic(
     jira_client: JiraFetcher,
     test_project_key: str,
@@ -758,6 +767,7 @@ async def test_jira_add_comment(
         cleanup_resources()
 
 
+@pytest.mark.anyio
 async def test_confluence_create_page(
     confluence_client: ConfluenceFetcher,
     test_space_key: str,
@@ -807,6 +817,7 @@ async def test_confluence_create_page(
         cleanup_resources()
 
 
+@pytest.mark.anyio
 async def test_confluence_update_page(
     confluence_client: ConfluenceFetcher,
     resource_tracker: ResourceTracker,
@@ -869,6 +880,7 @@ async def test_confluence_update_page(
         cleanup_resources()
 
 
+@pytest.mark.anyio
 async def test_confluence_add_page_label(
     confluence_client: ConfluenceFetcher,
     resource_tracker: ResourceTracker,
@@ -957,6 +969,7 @@ async def test_jira_transition_issue(
         cleanup_resources()
 
 
+@pytest.mark.anyio
 async def test_jira_create_epic_with_custom_fields(
     jira_client: JiraFetcher,
     test_project_key: str,
@@ -1042,6 +1055,7 @@ async def test_jira_create_epic_with_custom_fields(
         cleanup_resources()
 
 
+@pytest.mark.anyio
 async def test_jira_create_epic_two_step(
     jira_client: JiraFetcher,
     test_project_key: str,
@@ -1422,6 +1436,7 @@ class TestRealToolValidation:
             )
 
 
+@pytest.mark.anyio
 async def test_jira_get_issue_link_types(jira_client: JiraFetcher) -> None:
     """Test retrieving issue link types from Jira."""
     links_client = LinksMixin(config=jira_client.config)
@@ -1441,6 +1456,7 @@ async def test_jira_get_issue_link_types(jira_client: JiraFetcher) -> None:
         assert first_link.outward is not None
 
 
+@pytest.mark.anyio
 async def test_jira_create_and_remove_issue_link(
     jira_client: JiraFetcher,
     test_project_key: str,
