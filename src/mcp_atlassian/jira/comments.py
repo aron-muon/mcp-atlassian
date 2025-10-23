@@ -13,7 +13,7 @@ class CommentsMixin(JiraClient):
     """Mixin for Jira comment operations."""
 
     def get_issue_comments(
-        self, issue_key: str, limit: int = 50
+        self, issue_key: str, limit: int = 50, order: str | None = None
     ) -> list[dict[str, Any]]:
         """
         Get comments for a specific issue.
@@ -29,7 +29,12 @@ class CommentsMixin(JiraClient):
             Exception: If there is an error getting comments
         """
         try:
-            comments = self.jira.issue_get_comments(issue_key)
+            # Pass order parameter to underlying API call
+            api_params = {"issueKey": issue_key}
+            if order is not None:
+                api_params["order"] = order
+
+            comments = self.jira.issue_get_comments(**api_params)
 
             if not isinstance(comments, dict):
                 msg = f"Unexpected return value type from `jira.issue_get_comments`: {type(comments)}"
@@ -90,6 +95,41 @@ class CommentsMixin(JiraClient):
         except Exception as e:
             logger.error(f"Error adding comment to issue {issue_key}: {str(e)}")
             raise Exception(f"Error adding comment: {str(e)}") from e
+
+    def delete_issue_comment(
+        self, issue_key: str, comment_id: str
+    ) -> dict[str, Any]:
+        """
+        Delete a specific comment from an issue.
+
+        Args:
+            issue_key: The issue key (e.g. 'PROJ-123')
+            comment_id: The ID of the comment to delete
+
+        Returns:
+            Success status of the deletion operation
+
+        Raises:
+            Exception: If there is an error deleting the comment
+        """
+        try:
+            # Delete the comment using the underlying client
+            result = self.jira.issue_delete_comment(issue_key, comment_id)
+
+            # Log the deletion for audit purposes
+            logger.info(f"Comment {comment_id} deleted from issue {issue_key}")
+
+            # Return success status
+            return {
+                "success": True,
+                "comment_id": comment_id,
+                "issue_key": issue_key,
+                "message": "Comment deleted successfully"
+            }
+
+        except Exception as e:
+            logger.error(f"Error deleting comment {comment_id} from issue {issue_key}: {str(e)}")
+            raise Exception(f"Error deleting comment: {str(e)}") from e
 
     def _markdown_to_jira(self, markdown_text: str) -> str:
         """

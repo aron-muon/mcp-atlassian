@@ -622,6 +622,83 @@ def register_jira_tools(jira_mcp: FastMCP) -> None:
 
         return json.dumps(response_data, indent=2)
 
+    @jira_mcp.tool(tags={"jira", "write"})
+    @handle_tool_errors(default_return_key="deleted_comment", service_name="Jira")
+    async def delete_comment(
+        ctx: Context,
+        issue_key: Annotated[
+            str,
+            Field(
+                description="The key of the issue to delete comment from (e.g., 'PROJ-123').",
+            ),
+        ],
+        comment_id: Annotated[
+            str,
+            Field(
+                description="The ID of the comment to delete (e.g., '12345').",
+            ),
+        ],
+    ) -> str:
+        """
+        Delete a specific comment from a Jira issue.
+
+        This tool removes a specific comment from a Jira issue.
+        The user must have permission to delete comments on the issue.
+
+        Args:
+            ctx: The FastMCP context.
+            issue_key: The key of the issue to delete comment from.
+            comment_id: The ID of the comment to delete.
+
+        Returns:
+            JSON string representing the deletion result with status.
+
+        Raises:
+            ValueError: If the Jira client is not configured or parameters are missing.
+        """
+        jira = await get_jira_fetcher(ctx)
+        if not issue_key or not issue_key.strip():
+            raise ValueError("Issue key is required and cannot be empty")
+        if not comment_id or not comment_id.strip():
+            raise ValueError("Comment ID is required and cannot be empty")
+
+        try:
+            result = jira.delete_issue_comment(
+                issue_key=issue_key.strip(),
+                comment_id=comment_id.strip(),
+            )
+
+            response_data = {"success": True, "deleted_comment": result}
+            logger.info(f"Successfully deleted comment {comment_id} from issue {issue_key}")
+        except HTTPError as e:
+            logger.error(f"HTTP error deleting comment {comment_id} from issue {issue_key}: {e}")
+            error_message = f"Failed to delete comment: {str(e)}"
+            if e.response and e.response.status_code == 404:
+                error_message = f"Issue '{issue_key}' not found"
+            elif e.response and e.response.status_code == 403:
+                error_message = f"Access denied for issue '{issue_key}'"
+            elif e.response and e.response.status_code == 401:
+                error_message = "Authentication failed. Please check your credentials."
+            elif e.response and e.response.status_code == 404:
+                error_message = f"Comment '{comment_id}' not found in issue '{issue_key}'"
+
+            response_data = {
+                "success": False,
+                "error": error_message,
+                "issue_key": issue_key,
+                "comment_id": comment_id,
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error deleting comment {comment_id} from issue {issue_key}: {e}")
+            response_data = {
+                "success": False,
+                "error": f"An unexpected error occurred: {str(e)}",
+                "issue_key": issue_key,
+                "comment_id": comment_id,
+            }
+
+        return json.dumps(response_data, indent=2)
+
     @jira_mcp.tool(tags={"jira", "read"})
     @handle_tool_errors(default_return_key="epic_issues", service_name="Jira")
     async def get_epic_issues(
@@ -1293,7 +1370,13 @@ def register_jira_tools(jira_mcp: FastMCP) -> None:
                     '- Find by assignee: "assignee = currentUser()"\n'
                     '- Find recently updated: "updated >= -7d AND project = PROJ"\n'
                     '- Find by label: "labels = frontend AND project = PROJ"\n'
-                    '- Find by priority: "priority = High AND project = PROJ"'
+                    '- Find by priority: "priority = High AND project = PROJ"\n\n'
+                    "Active issues patterns (preferred over status inclusion):\n"
+                    '- Your active issues: "status NOT IN (\'Resolved\', \'Done\', \'Closed\') AND assignee = currentUser()"\n'
+                    '- Unassigned active issues: "status NOT IN (\'Resolved\', \'Done\', \'Closed\') AND assignee is EMPTY"\n'
+                    '- Active issues by project: "status NOT IN (\'Resolved\', \'Done\', \'Closed\') AND project = PROJ"\n'
+                    '- Recently active: "status NOT IN (\'Resolved\', \'Done\', \'Closed\') AND updated >= -7d"\n\n'
+                    "Note: Use exclusion patterns (NOT IN) rather than inclusion for better compatibility across Jira instances."
                 )
             ),
         ],
@@ -1387,6 +1470,104 @@ def register_jira_tools(jira_mcp: FastMCP) -> None:
                 "success": False,
                 "error": f"An unexpected error occurred: {str(e)}",
                 "jql": jql,
+            }
+
+        return json.dumps(response_data, indent=2)
+
+    @jira_mcp.tool(tags={"jira", "read"})
+    @handle_tool_errors(default_return_key="active_issues", service_name="Jira")
+    async def search_my_active_issues(
+        ctx: Context,
+        limit: Annotated[
+            int,
+            Field(description="Maximum number of results (1-50)", default=20, ge=1),
+        ] = 20,
+        start_at: Annotated[
+            int,
+            Field(description="Starting index for pagination (0-based)", default=0, ge=0),
+        ] = 0,
+        projects_filter: Annotated[
+            str | None,
+            Field(
+                description=(
+                    "(Optional) Comma-separated list of project keys to filter results by. "
+                    "Overrides the environment variable JIRA_PROJECTS_FILTER if provided."
+                ),
+                default=None,
+            ),
+        ] = None,
+        fields: Annotated[
+            str,
+            Field(
+                description=(
+                    "(Optional) Comma-separated fields to return in the results. "
+                    "Use '*all' for all fields, or specify individual fields like 'summary,status,assignee,priority'"
+                ),
+                default=",".join(DEFAULT_READ_JIRA_FIELDS),
+            ),
+        ] = ",".join(DEFAULT_READ_JIRA_FIELDS),
+        expand: Annotated[
+            str | None,
+            Field(
+                description=(
+                    "(Optional) Comma-separated fields to expand. Examples: 'renderedFields', 'transitions', 'changelog'"
+                ),
+            ),
+        ] = None,
+    ) -> str:
+        """
+        Search for current user's active issues using exclusion-based JQL.
+
+        This tool provides a convenient way to find all issues assigned to the current user
+        that are NOT in terminal/resolved states. It uses exclusion-based JQL that works
+        across different Jira configurations without requiring manual status specification.
+
+        Args:
+            ctx: The FastMCP context.
+            limit: Maximum number of results (default 20).
+            start_at: Starting index for pagination (default 0).
+            projects_filter: Comma-separated list of project keys to filter by.
+            fields: Comma-separated fields to return in the results.
+            expand: Optional fields to expand.
+
+        Returns:
+            JSON string representing the search results for active issues.
+
+        Raises:
+            ValueError: If the Jira client is not configured.
+        """
+        jira = await get_jira_fetcher(ctx)
+
+        # Use exclusion-based JQL to find active issues
+        # This excludes common terminal statuses rather than including active ones
+        jql = "status NOT IN ('Resolved', 'Done', 'Closed') AND assignee = currentUser() ORDER BY priority DESC, updated DESC"
+
+        try:
+            search_result = jira.search_issues(
+                jql=jql,
+                fields=fields,
+                start=start_at,
+                limit=limit,
+                expand=expand,
+                projects_filter=projects_filter,
+            )
+            result = search_result.to_simplified_dict()
+            response_data = {"success": True, "active_issues": result}
+        except HTTPError as e:
+            logger.error(f"HTTP error searching for active issues: {e}")
+            error_message = f"Active issues search failed: {str(e)}"
+            if e.response and e.response.status_code == 400:
+                error_message = f"Invalid JQL query: {jql}"
+            elif e.response and e.response.status_code == 403:
+                error_message = "Access denied. You may not have permission to search for active issues."
+            elif e.response and e.response.status_code == 401:
+                error_message = "Authentication failed. Please check your credentials."
+            response_data = {"success": False, "error": error_message}
+        except Exception as e:
+            logger.error(f"Unexpected error searching for active issues: {e}")
+            response_data = {
+                "success": False,
+                "error": f"An unexpected error occurred: {str(e)}",
             }
 
         return json.dumps(response_data, indent=2)

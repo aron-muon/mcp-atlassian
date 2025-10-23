@@ -14,6 +14,7 @@ from starlette.requests import Request
 
 from src.mcp_atlassian.jira import JiraFetcher
 from src.mcp_atlassian.jira.config import JiraConfig
+from src.mcp_atlassian.jira.constants import DEFAULT_READ_JIRA_FIELDS
 from src.mcp_atlassian.servers.context import MainAppContext
 from src.mcp_atlassian.servers.jira import register_jira_tools
 from src.mcp_atlassian.servers.main import AtlassianMCP
@@ -764,3 +765,200 @@ async def test_search_upstream_interface(jira_client, mock_jira_fetcher):
         expand=None,
         projects_filter=None,
     )
+
+
+@pytest.mark.anyio
+async def test_search_my_active_issues(jira_client, mock_jira_fetcher):
+    """Test the new search_my_active_issues tool with exclusion-based JQL."""
+    response = await jira_client.call_tool(
+        "jira_search_my_active_issues",
+        {
+            "limit": 15,
+            "start_at": 5,
+            "fields": "summary,status,assignee,priority",
+        },
+    )
+
+    assert isinstance(response, list)
+    assert len(response) > 0
+    text_content = response[0]
+    assert text_content.type == "text"
+    content = json.loads(text_content.text)
+
+    # Verify response structure
+    assert isinstance(content, dict)
+    assert content["success"] is True
+    assert "active_issues" in content
+    assert isinstance(content["active_issues"]["issues"], list)
+    assert len(content["active_issues"]["issues"]) >= 1
+    assert content["active_issues"]["total"] > 0
+    assert content["active_issues"]["start_at"] == 5
+    assert content["active_issues"]["max_results"] == 15
+
+    # Verify JQL query was the exclusion-based pattern we expect
+    expected_jql = "status NOT IN ('Resolved', 'Done', 'Closed') AND assignee = currentUser() ORDER BY priority DESC, updated DESC"
+    mock_jira_fetcher.search_issues.assert_called_once_with(
+        jql=expected_jql,
+        fields="summary,status,assignee,priority",
+        start=5,
+        limit=15,
+        expand=None,
+        projects_filter=None,
+    )
+
+
+@pytest.mark.anyio
+async def test_search_my_active_issues_defaults(jira_client, mock_jira_fetcher):
+    """Test the new search_my_active_issues tool with default parameters."""
+    response = await jira_client.call_tool(
+        "jira_search_my_active_issues",
+        {},
+    )
+
+    assert isinstance(response, list)
+    assert len(response) > 0
+    text_content = response[0]
+    assert text_content.type == "text"
+    content = json.loads(text_content.text)
+
+    # Verify response structure
+    assert content["success"] is True
+    assert "active_issues" in content
+
+    # Verify defaults were used correctly
+    expected_jql = "status NOT IN ('Resolved', 'Done', 'Closed') AND assignee = currentUser() ORDER BY priority DESC, updated DESC"
+    # Verify that search_issues was called with expected JQL and default parameters
+    mock_jira_fetcher.search_issues.assert_called_once()
+    call_kwargs = mock_jira_fetcher.search_issues.call_args.kwargs
+    assert call_kwargs["jql"] == expected_jql
+    assert call_kwargs["start"] == 0  # default start_at
+    assert call_kwargs["limit"] == 20  # default limit
+    assert call_kwargs["expand"] is None  # default expand
+    assert call_kwargs["projects_filter"] is None  # default projects_filter
+    # Verify fields contains the default fields (order doesn't matter due to string handling)
+    assert "summary" in call_kwargs["fields"]
+    assert "status" in call_kwargs["fields"]
+    assert "assignee" in call_kwargs["fields"]
+
+
+@pytest.mark.anyio
+async def test_search_my_active_issues_with_projects_filter(jira_client, mock_jira_fetcher):
+    """Test the new search_my_active_issues tool with projects filter."""
+    response = await jira_client.call_tool(
+        "jira_search_my_active_issues",
+        {
+            "projects_filter": "PROJ,WEB",
+            "limit": 5,
+        },
+    )
+
+    assert isinstance(response, list)
+    assert len(response) > 0
+    text_content = response[0]
+    assert text_content.type == "text"
+    content = json.loads(text_content.text)
+
+    # Verify response structure
+    assert content["success"] is True
+    assert "active_issues" in content
+
+    # Verify projects filter was passed correctly
+    expected_jql = "status NOT IN ('Resolved', 'Done', 'Closed') AND assignee = currentUser() ORDER BY priority DESC, updated DESC"
+    mock_jira_fetcher.search_issues.assert_called_once_with(
+        jql=expected_jql,
+        fields="summary,description,status,assignee,reporter,priority,issuetype,created,updated",  # DEFAULT_READ_JIRA_FIELDS
+        start=0,  # default start_at
+        limit=5,  # provided limit
+        expand=None,  # default expand
+        projects_filter="PROJ,WEB",  # provided projects_filter
+    )
+
+
+@pytest.mark.anyio
+async def test_delete_comment_successfully(jira_client, mock_jira_fetcher):
+    """Test successful comment deletion."""
+    # Mock the delete_issue_comment method to return a proper dictionary
+    mock_deletion_result = {
+        "id": "45678",
+        "issue_key": "PROJ-123",
+        "message": "Comment deleted successfully"
+    }
+    mock_jira_fetcher.delete_issue_comment.return_value = mock_deletion_result
+
+    response = await jira_client.call_tool(
+        "jira_delete_comment",
+        {"issue_key": "PROJ-123", "comment_id": "45678"},
+    )
+
+    assert isinstance(response, list)
+    assert len(response) > 0
+    text_content = response[0]
+    assert text_content.type == "text"
+    content = json.loads(text_content.text)
+
+    # Verify response structure
+    assert isinstance(content, dict)
+    assert content["success"] is True
+    assert "deleted_comment" in content
+
+    # Verify the mock was called correctly
+    mock_jira_fetcher.delete_issue_comment.assert_called_once_with(
+        issue_key="PROJ-123", comment_id="45678"
+    )
+
+
+@pytest.mark.anyio
+async def test_delete_comment_missing_issue_key(jira_client, mock_jira_fetcher):
+    """Test comment deletion with missing issue key."""
+    response = await jira_client.call_tool("jira_delete_comment", {"comment_id": "45678"})
+
+    assert isinstance(response, list)
+    assert len(response) > 0
+    text_content = response[0]
+    assert text_content.type == "text"
+    content = json.loads(text_content.text)
+
+    # Should return error
+    assert content["success"] is False
+    assert "error" in content
+    assert "Issue key is required" in content["error"]
+
+
+@pytest.mark.anyio
+async def test_delete_comment_missing_comment_id(jira_client, mock_jira_fetcher):
+    """Test comment deletion with missing comment ID."""
+    response = await jira_client.call_tool("jira_delete_comment", {"issue_key": "PROJ-123"})
+
+    assert isinstance(response, list)
+    assert len(response) > 0
+    text_content = response[0]
+    assert text_content.type == "text"
+    content = json.loads(text_content.text)
+
+    # Should return error
+    assert content["success"] is False
+    assert "error" in content
+    assert "Comment ID is required" in content["error"]
+
+
+@pytest.mark.anyio
+async def test_delete_comment_http_error(jira_client, mock_jira_fetcher):
+    """Test comment deletion with HTTP error."""
+    from requests.exceptions import HTTPError
+    mock_jira_fetcher.delete_issue_comment.side_effect = HTTPError("Comment not found")
+
+    response = await jira_client.call_tool(
+        "jira_delete_comment",
+        {"issue_key": "PROJ-123", "comment_id": "99999"},
+    )
+
+    assert isinstance(response, list)
+    assert len(response) > 0
+    text_content = response[0]
+    assert text_content.type == "text"
+    content = json.loads(text_content.text)
+
+    # Should return error
+    assert content["success"] is False
+    assert "error" in content
+    assert "Failed to delete comment" in content["error"]
