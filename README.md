@@ -625,40 +625,24 @@ Both transport types support single-user and multi-user authentication:
 
 1. Start the server with your chosen transport:
 
-<<<<<<< HEAD
-   ```bash
+ ```bash
    # For SSE transport
    docker run --rm -p 9000:9000 \
      --env-file /path/to/your/.env \
      ghcr.io/sooperset/mcp-atlassian:latest \
      --transport sse --port 9000 -vv
-=======
-    ```bash
-    # For SSE transport
-    docker run --rm -p 9000:9000 \
-      --env-file /path/to/your/.env \
-      ghcr.io/sooperset/mcp-atlassian:latest \
-      --transport sse --port 9000 -vv
-
-    # OR for streamable-http transport
-    docker run --rm -p 9000:9000 \
-      --env-file /path/to/your/.env \
-      ghcr.io/sooperset/mcp-atlassian:latest \
-      --transport streamable-http --port 9000 -vv
-
-    # OR for stateless streamable-http transport
-    docker run --rm -p 9000:9000 \
-      --env-file /path/to/your/.env \
-      ghcr.io/sooperset/mcp-atlassian:latest \
-      --transport streamable-http --stateless --port 9000 -vv
-    ```
->>>>>>> wyn_stateless
 
    # OR for streamable-http transport
    docker run --rm -p 9000:9000 \
      --env-file /path/to/your/.env \
      ghcr.io/sooperset/mcp-atlassian:latest \
      --transport streamable-http --port 9000 -vv
+
+   # OR for stateless streamable-http transport
+   docker run --rm -p 9000:9000 \
+     --env-file /path/to/your/.env \
+     ghcr.io/sooperset/mcp-atlassian:latest \
+     --transport streamable-http --stateless --port 9000 -vv
    ```
 2. Configure your IDE (single-user example):
 
@@ -791,91 +775,47 @@ Here's a complete example of setting up multi-user authentication with streamabl
 - `get_page_versions`: Get version information for a page
 - `confluence_create_page`: Create a new page
 - `confluence_update_page`: Update an existing page
-<<<<<<< HEAD
 - `confluence_move_page`: Move a page to a new location
-=======
-- `confluence_get_user_details`: Gets information about a conflunce user
->>>>>>> feature/get-user-details
+- `confluence_get_user_details`: Gets information about a confluence user
 
 <details> <summary>View All Tools</summary>
 
 | Operation       | Jira Tools                      | Confluence Tools                 |
 | --------------- | ------------------------------- | -------------------------------- |
-| **Read**  | `jira_search`                       | `confluence_search`            |
-<<<<<<< HEAD
-<<<<<<< HEAD
-|           | `jira_get_issue`                    | `confluence_get_page`          |
-|           | `jira_get_all_projects`             | `confluence_get_page_children` |
-=======
-|           | `jira_get_issue`                    | `confluence_get_page` (w/ versions) |
-|           | `jira_get_all_projects`             | `get_page_versions`        |
-|           | `jira_get_project_issues`           | `confluence_get_page_children` |
->>>>>>> maxheadroom/main
-|           | `jira_get_project_issues`           | `confluence_get_comments`      |
-|           | `jira_get_worklog`                  | `confluence_get_labels`        |
-|           | `jira_get_transitions`              | `confluence_search_user`       |
-<<<<<<< HEAD
-|           | `jira_search_fields`                |                                |
-|           | `jira_get_customfield_options`      |                                |
-|           | `jira_get_customfield_contexts`     |                                |
-|           | `jira_get_customfield_context_options` |                             |
-=======
-|           | `jira_search_fields`                | `confluence_get_user_details`                                 |
->>>>>>> feature/get-user-details
-|           | `jira_get_agile_boards`             |                                |
-|           | `jira_get_board_issues`             |                                |
-|           | `jira_get_sprints_from_board`       |                                |
-|           | `jira_get_sprint_issues`            |                                |
-|           | `jira_get_issue_link_types`         |                                |
-|           | `jira_batch_get_changelogs`*        |                                |
-|           | `jira_get_user_profile`             |                                |
-|           | `jira_download_attachments`         |                                |
-|           | `jira_get_project_versions`         |                                |
-| **Write** | `jira_create_issue`                 | `confluence_create_page`       |
-|           | `jira_update_issue`                 | `confluence_update_page`       |
-|           | `jira_delete_issue`                 | `confluence_delete_page`       |
-|           | `jira_batch_create_issues`          | `confluence_add_label`         |
-|           | `jira_add_comment`                  | `confluence_add_comment`       |
-|           | `jira_transition_issue`             |                                |
-|           | `jira_add_worklog`                  |                                |
-|           | `jira_link_to_epic`                 |                                |
-|           | `jira_create_sprint`                |                                |
-|           | `jira_update_sprint`                |                                |
-|           | `jira_create_issue_link`            |                                |
-|           | `jira_remove_issue_link`            |                                |
-|           | `jira_create_version`               |                                |
-|           | `jira_batch_create_versions`        |                                |
-=======
-|                 | `jira_get_issue`              | `confluence_get_page`            |
-|                 | `jira_get_all_projects`       | `confluence_get_page_children`   |
-|                 | `jira_get_project_issues`     | `confluence_get_comments`        |
-|                 | `jira_get_worklog`            | `confluence_get_labels`          |
-|                 | `jira_get_transitions`        | `confluence_search_user`         |
-|                 | `jira_search_fields`          |                                  |
-|                 | `jira_get_agile_boards`       |                                  |
-|                 | `jira_get_board_issues`       |                                  |
-|                 | `jira_get_sprints_from_board` |                                  |
-|                 | `jira_get_sprint_issues`      |                                  |
-|                 | `jira_get_issue_link_types`   |                                  |
-|                 | `jira_batch_get_changelogs`*  |                                  |
-|                 | `jira_get_user_profile`       |                                  |
-|                 | `jira_download_attachments`   |                                  |
-|                 | `jira_get_project_versions`   |                                  |
-| **Write** | `jira_create_issue`                 | `confluence_create_page`         |
-|                 | `jira_update_issue`           | `confluence_update_page`         |
-|                 | `jira_delete_issue`           | `confluence_delete_page`         |
-|                 | `jira_batch_create_issues`    | `confluence_add_label`           |
-|                 | `jira_add_comment`            | `confluence_add_comment`         |
-|                 | `jira_transition_issue`       | `confluence_move_page`           |
-|                 | `jira_add_worklog`            |                                  |
-|                 | `jira_link_to_epic`           |                                  |
-|                 | `jira_create_sprint`          |                                  |
-|                 | `jira_update_sprint`          |                                  |
-|                 | `jira_create_issue_link`      |                                  |
-|                 | `jira_remove_issue_link`      |                                  |
-|                 | `jira_create_version`         |                                  |
-|                 | `jira_batch_create_versions`  |                                  |
->>>>>>> codex/add-page-move-functionality
+| **Read**        | `jira_search`                   | `confluence_search`              |
+|                 | `jira_get_issue`                | `confluence_get_page` (w/ versions) |
+|                 | `jira_get_all_projects`         | `get_page_versions`              |
+|                 | `jira_get_project_issues`       | `confluence_get_page_children`   |
+|                 | `jira_get_project_issues`       | `confluence_get_comments`        |
+|                 | `jira_get_worklog`              | `confluence_get_labels`          |
+|                 | `jira_get_transitions`          | `confluence_search_user`         |
+|                 | `jira_search_fields`            | `confluence_get_user_details`    |
+|                 | `jira_get_customfield_options`  |                                  |
+|                 | `jira_get_customfield_contexts` |                                  |
+|                 | `jira_get_customfield_context_options` |                              |
+|                 | `jira_get_agile_boards`         |                                  |
+|                 | `jira_get_board_issues`         |                                  |
+|                 | `jira_get_sprints_from_board`   |                                  |
+|                 | `jira_get_sprint_issues`        |                                  |
+|                 | `jira_get_issue_link_types`     |                                  |
+|                 | `jira_batch_get_changelogs`*    |                                  |
+|                 | `jira_get_user_profile`         |                                  |
+|                 | `jira_download_attachments`     |                                  |
+|                 | `jira_get_project_versions`     |                                  |
+| **Write**       | `jira_create_issue`             | `confluence_create_page`         |
+|                 | `jira_update_issue`             | `confluence_update_page`         |
+|                 | `jira_delete_issue`             | `confluence_delete_page`         |
+|                 | `jira_batch_create_issues`      | `confluence_add_label`           |
+|                 | `jira_add_comment`              | `confluence_add_comment`         |
+|                 | `jira_transition_issue`         | `confluence_move_page`           |
+|                 | `jira_add_worklog`              |                                  |
+|                 | `jira_link_to_epic`             |                                  |
+|                 | `jira_create_sprint`            |                                  |
+|                 | `jira_update_sprint`            |                                  |
+|                 | `jira_create_issue_link`        |                                  |
+|                 | `jira_remove_issue_link`        |                                  |
+|                 | `jira_create_version`           |                                  |
+|                 | `jira_batch_create_versions`    |                                  |
 
 </details>
 
