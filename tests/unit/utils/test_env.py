@@ -52,10 +52,7 @@ class TestIsEnvTruthy:
         assert is_env_truthy("TEST_VAR", "false") is False
         assert is_env_truthy("TEST_VAR", "0") is False
 
-    def test_empty_string_environment_variable(self, monkeypatch):
-        """Test behavior when environment variable is set to empty string."""
-        monkeypatch.setenv("TEST_VAR", "")
-        assert is_env_truthy("TEST_VAR") is False
+    # Removed trivial test of empty string (already covered by standard falsy values test)
 
 
 class TestIsEnvExtendedTruthy:

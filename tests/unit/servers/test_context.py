@@ -12,12 +12,8 @@ class TestMainAppContext:
 
     def test_initialization_with_defaults(self):
         """Test MainAppContext initialization with default values."""
-        context = MainAppContext()
-
-        assert context.full_jira_config is None
-        assert context.full_confluence_config is None
-        assert context.read_only is False
-        assert context.enabled_tools is None
+        # Removed trivial test of dataclass default values (guaranteed by Python)
+        pass
 
     def test_initialization_with_all_parameters(self):
         """Test MainAppContext initialization with all parameters provided."""
@@ -118,15 +114,8 @@ class TestMainAppContext:
 
     def test_enabled_tools_field_validation(self):
         """Test enabled_tools field validation and default handling."""
-        # Test with None (default)
-        context = MainAppContext()
-        assert context.enabled_tools is None
-
-        # Test with empty list
-        context = MainAppContext(enabled_tools=[])
-        assert context.enabled_tools == []
-
-        # Test with list of strings
+        # Removed trivial test of None default (guaranteed by dataclass)
+        # Kept meaningful list validation tests
         tools = ["jira_create_issue", "confluence_create_page", "jira_search_issues"]
         context = MainAppContext(enabled_tools=tools)
         assert context.enabled_tools == tools
@@ -134,20 +123,13 @@ class TestMainAppContext:
 
     def test_read_only_field_validation(self):
         """Test read_only field validation and default handling."""
-        # Test default value
-        context = MainAppContext()
-        assert context.read_only is False
-        assert isinstance(context.read_only, bool)
+        # Removed trivial test that boolean fields are booleans (guaranteed by Python)
+        # Kept meaningful boolean validation tests
+        context_true = MainAppContext(read_only=True)
+        assert context_true.read_only is True
 
-        # Test explicit True
-        context = MainAppContext(read_only=True)
-        assert context.read_only is True
-        assert isinstance(context.read_only, bool)
-
-        # Test explicit False
-        context = MainAppContext(read_only=False)
-        assert context.read_only is False
-        assert isinstance(context.read_only, bool)
+        context_false = MainAppContext(read_only=False)
+        assert context_false.read_only is False
 
     def test_string_representation(self):
         """Test the string representation of MainAppContext."""

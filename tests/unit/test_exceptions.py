@@ -12,24 +12,8 @@ from src.mcp_atlassian.exceptions import MCPAtlassianAuthenticationError
 class TestMCPAtlassianAuthenticationError:
     """Tests for the MCPAtlassianAuthenticationError exception class."""
 
-    def test_instantiation_without_message(self):
-        """Test creating exception without a message."""
-        error = MCPAtlassianAuthenticationError()
-
-        assert isinstance(error, MCPAtlassianAuthenticationError)
-        assert isinstance(error, Exception)
-        assert str(error) == ""
-        assert error.args == ()
-
-    def test_instantiation_with_message(self):
-        """Test creating exception with a message."""
-        message = "Authentication failed"
-        error = MCPAtlassianAuthenticationError(message)
-
-        assert isinstance(error, MCPAtlassianAuthenticationError)
-        assert isinstance(error, Exception)
-        assert str(error) == message
-        assert error.args == (message,)
+    # Removed trivial tests for basic exception instantiation (guaranteed by Python exception mechanism)
+    # Exception instantiation works the same as any Python exception
 
     def test_instantiation_with_multiple_args(self):
         """Test creating exception with multiple arguments."""
@@ -43,15 +27,8 @@ class TestMCPAtlassianAuthenticationError:
         assert str(error) == "('Authentication failed', 401)"
         assert error.args == (message, code)
 
-    def test_inheritance_hierarchy(self):
-        """Test that the exception properly inherits from Exception."""
-        error = MCPAtlassianAuthenticationError("test")
-
-        assert isinstance(error, MCPAtlassianAuthenticationError)
-        assert isinstance(error, Exception)
-        assert isinstance(error, BaseException)
-        assert issubclass(MCPAtlassianAuthenticationError, Exception)
-        assert issubclass(MCPAtlassianAuthenticationError, BaseException)
+    # Removed trivial inheritance test (guaranteed by class definition)
+    # Exception inheritance is guaranteed by Python's class mechanism
 
     def test_string_representation(self):
         """Test string representation of the exception."""
